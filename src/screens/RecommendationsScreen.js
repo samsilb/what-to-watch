@@ -87,7 +87,7 @@ export default function RecommendationsScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Hey, {user?.name}!</Text>
-          <Text style={styles.title}>What to Watch</Text>
+          <Text style={styles.title}>LA Cine</Text>
         </View>
         <TouchableOpacity onPress={signOut} style={styles.signOutButton}>
           <Text style={styles.signOutText}>Sign Out</Text>
@@ -149,12 +149,12 @@ export default function RecommendationsScreen() {
       ) : (
         // Discover view
         <>
-          <Text style={styles.prompt}>What are you in the mood for?</Text>
+          <Text style={styles.prompt}>What LA vibe are you feeling?</Text>
 
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="e.g. a funny comedy, something thrilling..."
+            placeholder="e.g. beach vibes, Hollywood drama, noir..."
             placeholderTextColor="#666"
             style={styles.input}
           />

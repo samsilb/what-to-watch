@@ -48,7 +48,8 @@ export default function SignInScreen() {
       style={styles.container}
     >
       <View style={styles.card}>
-        <Text style={styles.title}>What to Watch</Text>
+        <Text style={styles.title}>LA Cine</Text>
+        <Text style={styles.tagline}>Movies & TV set in the City of Angels</Text>
         <Text style={styles.subtitle}>
           {isSignUp ? 'Create an account' : 'Sign in to continue'}
         </Text>
@@ -117,9 +118,16 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    marginBottom: 8,
+    marginBottom: 4,
     textAlign: 'center',
     color: '#fff',
+  },
+  tagline: {
+    fontSize: 14,
+    color: '#e94560',
+    textAlign: 'center',
+    marginBottom: 8,
+    fontStyle: 'italic',
   },
   subtitle: {
     fontSize: 16,
