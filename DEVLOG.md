@@ -10,6 +10,9 @@
 
 ## Session 1 - February 16, 2026
 
+### The Vibe
+First day of building! Started with a basic template and ended with a fully working app. Broke things, fixed things, changed the theme 5 times, and accidentally tried to upload 22,000 files to GitHub. Classic first day energy.
+
 ### What We Built
 1. **Core App Features (Already existed)**
    - User authentication (email/password via Firebase)
@@ -40,6 +43,14 @@
    - Purple borders and accents (#9d4edd)
    - Uppercase text with letter spacing (noir typography)
    - Sharp corners throughout
+
+### Lessons Learned (The Fun Stuff)
+- **API keys expire and models change** - The Gemini model name we started with was outdated. Tech moves fast! When you see "model not found" errors, it usually means you need a newer version.
+- **Rate limits are real** - Hit the "quota exceeded" wall after testing too enthusiastically. Free tiers have limits - pace yourself!
+- **node_modules is MASSIVE** - Accidentally committed 22,000+ files to git. Oops. That's why .gitignore exists. Lesson: always ignore node_modules!
+- **Themes are subjective** - Tried 5 different color schemes before landing on Neon Noir. Design is about experimenting until it feels right.
+- **Firebase setup has multiple steps** - Creating the project is just step one. You also need to enable Firestore AND set security rules. The app doesn't tell you what's missing - you have to figure it out.
+- **Building an app is mostly problem-solving** - 80% of the work was fixing things that didn't work the first time. That's normal. That's coding.
 
 ### Commits Made
 1. `Add complete What to Watch app with AI recommendations and favorites`
