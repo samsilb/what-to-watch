@@ -1,161 +1,374 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
+  FlatList,
   StyleSheet,
-  ScrollView,
+  ActivityIndicator,
+  SafeAreaView,
+  Alert,
 } from 'react-native';
-import { colors } from '../theme/colors';
-import { recommendationsByMood } from '../data/recommendations';
+import { useAuth } from '../context/AuthContext';
+import { getRecommendations } from '../lib/aiClient';
+import { saveFavorite, getFavorites, removeFavorite } from '../lib/favorites';
 
-export default function RecommendationsScreen({ route, navigation }) {
-  const { mood } = route.params;
-  const recommendations = recommendationsByMood[mood.id] || [];
+export default function RecommendationsScreen() {
+  const { user, signOut } = useAuth();
+  const [query, setQuery] = useState('');
+  const [items, setItems] = useState([]);
+  const [favorites, setFavorites] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showFavorites, setShowFavorites] = useState(false);
+  const [savingId, setSavingId] = useState(null);
+
+  // Load favorites when screen opens
+  useEffect(() => {
+    loadFavorites();
+  }, []);
+
+  const loadFavorites = async () => {
+    const result = await getFavorites(user.uid);
+    if (result.success) {
+      setFavorites(result.favorites);
+    }
+  };
+
+  const handleGet = async () => {
+    setLoading(true);
+    try {
+      const recs = await getRecommendations(query || 'something light and fun');
+      setItems(recs);
+      setShowFavorites(false);
+    } catch (e) {
+      setItems([{ title: 'Error', description: e.message }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async (item, index) => {
+    setSavingId(index);
+    const result = await saveFavorite(user.uid, item);
+    if (result.success) {
+      Alert.alert('Saved!', `"${item.title}" added to your favorites.`);
+      loadFavorites(); // Refresh favorites list
+    } else {
+      Alert.alert('Error', 'Could not save. Please try again.');
+    }
+    setSavingId(null);
+  };
+
+  const handleRemove = async (favoriteId, title) => {
+    Alert.alert(
+      'Remove Favorite',
+      `Remove "${title}" from your favorites?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            await removeFavorite(favoriteId);
+            loadFavorites();
+          },
+        },
+      ]
+    );
+  };
+
+  const isAlreadySaved = (title) => {
+    return favorites.some((fav) => fav.title === title);
+  };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
-        <View style={styles.moodBadge}>
-          <Text style={styles.moodEmoji}>{mood.emoji}</Text>
-          <Text style={styles.moodLabel}>Feeling {mood.label}</Text>
+        <View>
+          <Text style={styles.greeting}>Hey, {user?.name}!</Text>
+          <Text style={styles.title}>What to Watch</Text>
         </View>
+        <TouchableOpacity onPress={signOut} style={styles.signOutButton}>
+          <Text style={styles.signOutText}>Sign Out</Text>
+        </TouchableOpacity>
       </View>
 
-      <Text style={styles.title}>Perfect picks for you</Text>
+      {/* Tab buttons */}
+      <View style={styles.tabs}>
+        <TouchableOpacity
+          style={[styles.tab, !showFavorites && styles.tabActive]}
+          onPress={() => setShowFavorites(false)}
+        >
+          <Text style={[styles.tabText, !showFavorites && styles.tabTextActive]}>
+            Discover
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, showFavorites && styles.tabActive]}
+          onPress={() => setShowFavorites(true)}
+        >
+          <Text style={[styles.tabText, showFavorites && styles.tabTextActive]}>
+            Favorites ({favorites.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {recommendations.map((item, index) => (
-          <View key={index} style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>{item.title}</Text>
-              <View
-                style={[
-                  styles.typeBadge,
-                  item.type === 'TV' && styles.typeBadgeTV,
-                ]}
-              >
-                <Text style={styles.typeText}>{item.type}</Text>
+      {showFavorites ? (
+        // Favorites view
+        <FlatList
+          data={favorites}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <View style={styles.item}>
+              <View style={styles.itemContent}>
+                <Text style={styles.itemTitle}>{item.title}</Text>
+                {item.description ? (
+                  <Text style={styles.itemDesc}>{item.description}</Text>
+                ) : null}
               </View>
+              <TouchableOpacity
+                style={styles.removeButton}
+                onPress={() => handleRemove(item.id, item.title)}
+              >
+                <Text style={styles.removeButtonText}>Remove</Text>
+              </TouchableOpacity>
             </View>
-            <Text style={styles.reason}>{item.reason}</Text>
-          </View>
-        ))}
-      </ScrollView>
+          )}
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>No favorites yet!</Text>
+              <Text style={styles.emptySubtext}>
+                Get some recommendations and tap the heart to save them.
+              </Text>
+            </View>
+          }
+        />
+      ) : (
+        // Discover view
+        <>
+          <Text style={styles.prompt}>What are you in the mood for?</Text>
 
-      <TouchableOpacity
-        style={styles.refreshButton}
-        onPress={() => navigation.goBack()}
-      >
-        <Text style={styles.refreshText}>Try a different mood</Text>
-      </TouchableOpacity>
-    </View>
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="e.g. a funny comedy, something thrilling..."
+            placeholderTextColor="#666"
+            style={styles.input}
+          />
+
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleGet}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Get Suggestions</Text>
+            )}
+          </TouchableOpacity>
+
+          <FlatList
+            data={items}
+            keyExtractor={(item, idx) => idx.toString()}
+            renderItem={({ item, index }) => (
+              <View style={styles.item}>
+                <View style={styles.itemContent}>
+                  <Text style={styles.itemTitle}>{item.title}</Text>
+                  {item.description ? (
+                    <Text style={styles.itemDesc}>{item.description}</Text>
+                  ) : null}
+                </View>
+                {item.title !== 'Error' && item.title !== 'Oops! Something went wrong' && (
+                  <TouchableOpacity
+                    style={[
+                      styles.saveButton,
+                      isAlreadySaved(item.title) && styles.savedButton,
+                    ]}
+                    onPress={() => handleSave(item, index)}
+                    disabled={savingId === index || isAlreadySaved(item.title)}
+                  >
+                    {savingId === index ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.saveButtonText}>
+                        {isAlreadySaved(item.title) ? 'Saved' : 'Save'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+            style={styles.list}
+            contentContainerStyle={styles.listContent}
+          />
+        </>
+      )}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
-    paddingTop: 60,
+    backgroundColor: '#1a1a2e',
   },
   header: {
-    paddingHorizontal: 24,
-    marginBottom: 24,
-  },
-  backButton: {
-    marginBottom: 16,
-  },
-  backText: {
-    color: colors.textMuted,
-    fontSize: 16,
-  },
-  moodBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  moodEmoji: {
-    fontSize: 24,
-  },
-  moodLabel: {
-    fontSize: 16,
-    color: colors.textMuted,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.text,
-    paddingHorizontal: 24,
-    marginBottom: 20,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  listContent: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-    gap: 16,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.primary,
-  },
-  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
+    alignItems: 'flex-start',
+    padding: 20,
+    paddingTop: 16,
   },
-  cardTitle: {
+  greeting: {
+    fontSize: 14,
+    color: '#888',
+    marginBottom: 4,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  signOutButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#16213e',
+    borderRadius: 8,
+  },
+  signOutText: {
+    color: '#e94560',
+    fontSize: 14,
+  },
+  tabs: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+    gap: 12,
+  },
+  tab: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    backgroundColor: '#16213e',
+  },
+  tabActive: {
+    backgroundColor: '#e94560',
+  },
+  tabText: {
+    color: '#888',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  tabTextActive: {
+    color: '#fff',
+  },
+  prompt: {
+    color: '#ccc',
+    fontSize: 16,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#333',
+    padding: 14,
+    borderRadius: 10,
+    marginHorizontal: 20,
+    marginBottom: 12,
+    backgroundColor: '#0f0f23',
+    color: '#fff',
+    fontSize: 16,
+  },
+  button: {
+    backgroundColor: '#e94560',
+    padding: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginHorizontal: 20,
+  },
+  buttonDisabled: {
+    backgroundColor: '#666',
+  },
+  buttonText: {
+    color: '#fff',
     fontSize: 18,
     fontWeight: '600',
-    color: colors.text,
+  },
+  list: {
     flex: 1,
-    marginRight: 12,
+    marginTop: 20,
   },
-  typeBadge: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
+  listContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
-  typeBadgeTV: {
-    backgroundColor: colors.secondary,
-  },
-  typeText: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  reason: {
-    fontSize: 15,
-    color: colors.textMuted,
-    lineHeight: 22,
-  },
-  refreshButton: {
-    margin: 24,
+  item: {
     padding: 16,
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: '#16213e',
     borderRadius: 12,
-    alignItems: 'center',
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
-  refreshText: {
-    color: colors.text,
+  itemContent: {
+    flex: 1,
+  },
+  itemTitle: {
+    fontWeight: '700',
     fontSize: 16,
+    color: '#fff',
+  },
+  itemDesc: {
+    color: '#aaa',
+    marginTop: 6,
+    lineHeight: 20,
+  },
+  saveButton: {
+    backgroundColor: '#e94560',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    marginLeft: 12,
+  },
+  savedButton: {
+    backgroundColor: '#444',
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: '600',
+  },
+  removeButton: {
+    backgroundColor: '#333',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    marginLeft: 12,
+  },
+  removeButtonText: {
+    color: '#e94560',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingTop: 60,
+    paddingHorizontal: 40,
+  },
+  emptyText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    color: '#888',
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
