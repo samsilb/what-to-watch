@@ -12,10 +12,14 @@ import {
   SafeAreaView,
   Alert,
   Linking,
+  ImageBackground,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { getRecommendations } from '../lib/aiClient';
 import { saveFavorite, getFavorites, removeFavorite, rateFavorite } from '../lib/favorites';
+
+// Hollywood sign at sunset
+const BG_IMAGE = 'https://images.unsplash.com/photo-1515896769750-31548aa180ed?w=800&q=80';
 
 const GENRES = ['Action', 'Comedy', 'Drama', 'Thriller', 'Romance', 'Sci-Fi', 'Horror'];
 
@@ -111,7 +115,13 @@ export default function RecommendationsScreen() {
 
   
   return (
-    <SafeAreaView style={styles.container}>
+    <ImageBackground
+      source={{ uri: BG_IMAGE }}
+      style={styles.background}
+      resizeMode="cover"
+    >
+      <View style={styles.overlay} />
+      <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Hey, {user?.name}!</Text>
@@ -341,14 +351,21 @@ export default function RecommendationsScreen() {
           />
         </>
       )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  background: {
+    flex: 1,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10, 10, 18, 0.7)',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#0a0a12',
   },
   header: {
     flexDirection: 'row',

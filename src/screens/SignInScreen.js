@@ -9,8 +9,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  ImageBackground,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+
+// LA skyline at night with palm trees
+const BG_IMAGE = 'https://images.unsplash.com/photo-1580655653885-65763b2597d0?w=800&q=80';
 
 export default function SignInScreen() {
   const [email, setEmail] = useState('');
@@ -43,11 +47,17 @@ export default function SignInScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.select({ ios: 'padding', android: undefined })}
-      style={styles.container}
+    <ImageBackground
+      source={{ uri: BG_IMAGE }}
+      style={styles.background}
+      resizeMode="cover"
     >
-      <View style={styles.card}>
+      <View style={styles.overlay} />
+      <KeyboardAvoidingView
+        behavior={Platform.select({ ios: 'padding', android: undefined })}
+        style={styles.container}
+      >
+        <View style={styles.card}>
         <Text style={styles.title}>LA Cine</Text>
         <Text style={styles.tagline}>Movies & TV set in the City of Angels</Text>
         <Text style={styles.subtitle}>
@@ -98,17 +108,24 @@ export default function SignInScreen() {
               : "Don't have an account? Sign Up"}
           </Text>
         </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+        </View>
+      </KeyboardAvoidingView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  background: {
+    flex: 1,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10, 10, 18, 0.65)',
+  },
   container: {
     flex: 1,
     justifyContent: 'center',
     padding: 16,
-    backgroundColor: '#0a0a12',
   },
   card: {
     backgroundColor: '#141428',
