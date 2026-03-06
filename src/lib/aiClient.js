@@ -1,6 +1,6 @@
 // Gemini AI client for generating movie/show recommendations
 
-const GEMINI_API_KEY = 'AIzaSyDK_YA0VxGey_16Znj_w7NGnxThUz1yRpc';
+const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 export async function getRecommendations(userInput) {

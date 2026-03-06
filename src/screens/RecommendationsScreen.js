@@ -4,11 +4,13 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  Pressable,
   FlatList,
   StyleSheet,
   ActivityIndicator,
   SafeAreaView,
   Alert,
+  Linking,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { getRecommendations } from '../lib/aiClient';
@@ -82,6 +84,12 @@ export default function RecommendationsScreen() {
     return favorites.some((fav) => fav.title === title);
   };
 
+  const openTrailer = (title) => {
+    const searchQuery = encodeURIComponent(`${title} official trailer`);
+    const youtubeUrl = `https://www.youtube.com/results?search_query=${searchQuery}`;
+    Linking.openURL(youtubeUrl);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -127,12 +135,36 @@ export default function RecommendationsScreen() {
                   <Text style={styles.itemDesc}>{item.description}</Text>
                 ) : null}
               </View>
-              <TouchableOpacity
-                style={styles.removeButton}
-                onPress={() => handleRemove(item.id, item.title)}
-              >
-                <Text style={styles.removeButtonText}>Remove</Text>
-              </TouchableOpacity>
+              <View style={styles.buttonGroup}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.cardButton,
+                    styles.trailerButton,
+                    pressed && styles.trailerButtonPressed,
+                  ]}
+                  onPress={() => openTrailer(item.title)}
+                >
+                  {({ pressed }) => (
+                    <Text style={[styles.trailerButtonText, pressed && styles.trailerButtonTextPressed]}>
+                      Trailer
+                    </Text>
+                  )}
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.cardButton,
+                    styles.removeButton,
+                    pressed && styles.removeButtonPressed,
+                  ]}
+                  onPress={() => handleRemove(item.id, item.title)}
+                >
+                  {({ pressed }) => (
+                    <Text style={[styles.removeButtonText, pressed && styles.removeButtonTextPressed]}>
+                      Remove
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
             </View>
           )}
           style={styles.list}
@@ -183,22 +215,45 @@ export default function RecommendationsScreen() {
                   ) : null}
                 </View>
                 {item.title !== 'Error' && item.title !== 'Oops! Something went wrong' && (
-                  <TouchableOpacity
-                    style={[
-                      styles.saveButton,
-                      isAlreadySaved(item.title) && styles.savedButton,
-                    ]}
-                    onPress={() => handleSave(item, index)}
-                    disabled={savingId === index || isAlreadySaved(item.title)}
-                  >
-                    {savingId === index ? (
-                      <ActivityIndicator color="#fff" size="small" />
-                    ) : (
-                      <Text style={styles.saveButtonText}>
-                        {isAlreadySaved(item.title) ? 'Saved' : 'Save'}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
+                  <View style={styles.buttonGroup}>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.cardButton,
+                        styles.trailerButton,
+                        pressed && styles.trailerButtonPressed,
+                      ]}
+                      onPress={() => openTrailer(item.title)}
+                    >
+                      {({ pressed }) => (
+                        <Text style={[styles.trailerButtonText, pressed && styles.trailerButtonTextPressed]}>
+                          Trailer
+                        </Text>
+                      )}
+                    </Pressable>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.cardButton,
+                        styles.saveButton,
+                        isAlreadySaved(item.title) && styles.savedButton,
+                        pressed && !isAlreadySaved(item.title) && styles.saveButtonPressed,
+                      ]}
+                      onPress={() => handleSave(item, index)}
+                      disabled={savingId === index || isAlreadySaved(item.title)}
+                    >
+                      {({ pressed }) =>
+                        savingId === index ? (
+                          <ActivityIndicator color="#fff" size="small" />
+                        ) : (
+                          <Text style={[
+                            styles.saveButtonText,
+                            pressed && !isAlreadySaved(item.title) && styles.saveButtonTextPressed,
+                          ]}>
+                            {isAlreadySaved(item.title) ? 'Saved' : 'Save'}
+                          </Text>
+                        )
+                      }
+                    </Pressable>
+                  </View>
                 )}
               </View>
             )}
@@ -362,36 +417,67 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontStyle: 'italic',
   },
-  saveButton: {
-    backgroundColor: '#ff2e97',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 2,
+  buttonGroup: {
+    flexDirection: 'column',
+    gap: 8,
     marginLeft: 12,
-    shadowColor: '#ff2e97',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
   },
-  savedButton: {
-    backgroundColor: '#333',
-    shadowOpacity: 0,
+  cardButton: {
+    width: 80,
+    paddingVertical: 8,
+    borderRadius: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  saveButtonText: {
-    color: '#fff',
+  trailerButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#00f0ff',
+  },
+  trailerButtonPressed: {
+    backgroundColor: '#00f0ff',
+  },
+  trailerButtonText: {
+    color: '#00f0ff',
     fontSize: 12,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 1,
+    textAlign: 'center',
+  },
+  trailerButtonTextPressed: {
+    color: '#0a0a12',
+  },
+  saveButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#ff2e97',
+  },
+  saveButtonPressed: {
+    backgroundColor: '#ff2e97',
+  },
+  saveButtonTextPressed: {
+    color: '#fff',
+  },
+  savedButton: {
+    backgroundColor: '#ff2e97',
+    borderColor: '#ff2e97',
+  },
+  saveButtonText: {
+    color: '#ff2e97',
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    textAlign: 'center',
   },
   removeButton: {
     backgroundColor: 'transparent',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 2,
-    marginLeft: 12,
     borderWidth: 1,
     borderColor: '#ff2e97',
+  },
+  removeButtonPressed: {
+    backgroundColor: '#ff2e97',
   },
   removeButtonText: {
     color: '#ff2e97',
@@ -399,6 +485,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 1,
+    textAlign: 'center',
+  },
+  removeButtonTextPressed: {
+    color: '#fff',
   },
   emptyState: {
     alignItems: 'center',
