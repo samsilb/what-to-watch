@@ -292,7 +292,7 @@ export default function RecommendationsScreen() {
                     <Text style={styles.itemDesc}>{item.description}</Text>
                   ) : null}
                 </View>
-                {item.title !== 'Error' && item.title !== 'Oops! Something went wrong' && (
+                {!['Error', 'Ugh, as if!', 'Whatever!', "I'm totally buggin'!", 'Way harsh, Tai'].includes(item.title) && (
                   <View style={styles.buttonGroup}>
                     <Pressable
                       style={({ pressed }) => [

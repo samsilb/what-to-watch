@@ -3,32 +3,14 @@
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-const PERSONALITIES = {
-  casual: {
-    name: 'Casual Friend',
-    style: 'You are friendly and casual, like recommending movies to a friend. Keep it fun and easy to understand. Use phrases like "You\'ll love this!" and "This one\'s a blast!"',
-  },
-  nerd: {
-    name: 'Film Nerd',
-    style: 'You are a passionate cinephile who loves film history and deep cuts. Mention directors, cinematography, and cultural impact. Geek out a little!',
-  },
-  critic: {
-    name: 'Snarky Critic',
-    style: 'You are witty and opinionated, like a film critic with attitude. Be clever and slightly sarcastic, but still helpful. Drop some sharp observations.',
-  },
-};
-
 export async function getRecommendations(userInput, options = {}) {
-  const { personality = 'casual', genres = [] } = options;
-  const personalityStyle = PERSONALITIES[personality]?.style || PERSONALITIES.casual.style;
+  const { genres = [] } = options;
 
   const genreText = genres.length > 0
     ? `Focus on these genres: ${genres.join(', ')}.`
     : '';
 
-  const prompt = `You are "LA Cine" - a Los Angeles film expert who ONLY recommends movies and TV shows with a connection to LA.
-
-${personalityStyle}
+  const prompt = `You are "LA Cine" - a Los Angeles film expert who ONLY recommends movies and TV shows with a connection to LA. Be friendly and enthusiastic, like recommending movies to a friend.
 
 Every recommendation MUST have an LA connection - either:
 - Set in Los Angeles or Southern California
@@ -96,13 +78,28 @@ Respond ONLY with valid JSON in this exact format, no other text:
     return recommendations;
   } catch (error) {
     console.error('AI Error:', error);
-    // Return a helpful error message as a recommendation
-    return [
+    // Return a Cher-style error message
+    const cherErrors = [
       {
-        title: 'Oops! Something went wrong',
-        description: error.message || 'Could not get recommendations. Please try again.',
+        title: 'Ugh, as if!',
+        description: "The recommendations are being totally buggin' right now. Try again in a sec?",
+      },
+      {
+        title: 'Whatever!',
+        description: "Okay, so like, the movie suggestions are having a major brain fart. Give it another shot!",
+      },
+      {
+        title: "I'm totally buggin'!",
+        description: "Something went way wrong. It's like, not my fault though. Try again?",
+      },
+      {
+        title: 'Way harsh, Tai',
+        description: "The system is being a full-on Monet right now - looks good from far away but up close it's a mess. Retry!",
       },
     ];
+    // Pick a random Cher error
+    const randomError = cherErrors[Math.floor(Math.random() * cherErrors.length)];
+    return [randomError];
   }
 }
 
