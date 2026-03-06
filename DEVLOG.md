@@ -69,15 +69,70 @@ First day of building! Started with a basic template and ended with a fully work
 
 ---
 
+## Session 2 - March 6, 2026
+
+### The Vibe
+Feature day! Added trailers, genre filters, and ratings. Iterated on design - removed things that felt unnecessary (like the "Vibe" personality picker). Learned that sometimes less is more.
+
+### What We Built
+
+1. **Trailer Integration**
+   - "Trailer" button on every recommendation card
+   - Opens YouTube search for the movie's official trailer
+   - Works on both Discover and Favorites views
+   - No API key needed - just uses YouTube search
+
+2. **Genre Filters**
+   - Horizontal scrolling genre chips (Action, Comedy, Drama, etc.)
+   - Tap to select multiple genres
+   - Selected genres glow cyan and fill in
+   - AI recommendations now filter by selected genres
+
+3. **Ratings System**
+   - Thumbs up/down rating on favorites
+   - Ratings save to Firestore
+   - 👍 glows cyan, 👎 glows pink when selected
+   - Track what you loved vs what was just okay
+
+4. **Button Polish**
+   - All card buttons now same width
+   - Buttons fill in when pressed (satisfying tap feedback)
+   - "Saved" button shows "✓ Saved" with white text on pink
+
+5. **Security Improvement**
+   - Moved Gemini API key to environment variable
+   - No more hardcoded secrets in the codebase
+
+### What We Tried & Removed
+- **"Surprise Me" button** - Built it, but felt unnecessary. Removed.
+- **AI Personality Picker** - Cool idea (Casual/Film Nerd/Snarky), but cluttered the UI. Removed.
+- **"Vibe" and "Genres" labels** - The buttons are self-explanatory. Cleaner without labels.
+
+### Lessons Learned
+- **Iterate and remove** - Not every feature improves the app. It's okay to build something and then remove it.
+- **Rate limits strike again** - Hit the Gemini quota while testing. The `-c` flag on `npx expo start -c` clears cache when things get stuck.
+- **Press states matter** - Adding fill-on-press feedback makes buttons feel more responsive and polished.
+
+### Commits Made
+1. `Add trailer button with YouTube integration`
+2. `Add genre filters, ratings, and UI polish`
+
+### Files Modified
+- `src/lib/aiClient.js` - Genre filtering, env variable for API key
+- `src/lib/favorites.js` - Rating function
+- `src/screens/RecommendationsScreen.js` - Trailers, genres, ratings, button polish
+
+---
+
 ## Ideas for Future Sessions
 
 ### Stretch Features (Competition Differentiators)
-- [ ] "Surprise Me" random recommendation button
-- [ ] AI personality options (snarky critic, enthusiastic friend, film professor)
-- [ ] Filters (genre, decade, streaming platform, mood)
+- [x] ~~"Surprise Me" random recommendation button~~ (tried, removed)
+- [x] ~~AI personality options~~ (tried, removed - cluttered UI)
+- [x] Filters (genre) ✅
 - [ ] Shareable recommendation cards
 - [ ] Viewing history tracker
-- [ ] Rate recommendations to improve future suggestions
+- [x] Rate recommendations ✅
 - [ ] Social features (see what friends are watching)
 
 ### Polish

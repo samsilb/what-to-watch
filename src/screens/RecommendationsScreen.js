@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Pressable,
   FlatList,
+  ScrollView,
   StyleSheet,
   ActivityIndicator,
   SafeAreaView,
@@ -14,7 +15,9 @@ import {
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { getRecommendations } from '../lib/aiClient';
-import { saveFavorite, getFavorites, removeFavorite } from '../lib/favorites';
+import { saveFavorite, getFavorites, removeFavorite, rateFavorite } from '../lib/favorites';
+
+const GENRES = ['Action', 'Comedy', 'Drama', 'Thriller', 'Romance', 'Sci-Fi', 'Horror'];
 
 export default function RecommendationsScreen() {
   const { user, signOut } = useAuth();
@@ -24,6 +27,7 @@ export default function RecommendationsScreen() {
   const [loading, setLoading] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
   const [savingId, setSavingId] = useState(null);
+  const [selectedGenres, setSelectedGenres] = useState([]);
 
   // Load favorites when screen opens
   useEffect(() => {
@@ -37,10 +41,20 @@ export default function RecommendationsScreen() {
     }
   };
 
+  const toggleGenre = (genre) => {
+    setSelectedGenres((prev) =>
+      prev.includes(genre)
+        ? prev.filter((g) => g !== genre)
+        : [...prev, genre]
+    );
+  };
+
   const handleGet = async () => {
     setLoading(true);
     try {
-      const recs = await getRecommendations(query || 'something light and fun');
+      const recs = await getRecommendations(query || 'something light and fun', {
+        genres: selectedGenres,
+      });
       setItems(recs);
       setShowFavorites(false);
     } catch (e) {
@@ -80,6 +94,11 @@ export default function RecommendationsScreen() {
     );
   };
 
+  const handleRate = async (favoriteId, rating) => {
+    await rateFavorite(favoriteId, rating);
+    loadFavorites();
+  };
+
   const isAlreadySaved = (title) => {
     return favorites.some((fav) => fav.title === title);
   };
@@ -90,6 +109,7 @@ export default function RecommendationsScreen() {
     Linking.openURL(youtubeUrl);
   };
 
+  
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -134,6 +154,34 @@ export default function RecommendationsScreen() {
                 {item.description ? (
                   <Text style={styles.itemDesc}>{item.description}</Text>
                 ) : null}
+                {/* Rating buttons */}
+                <View style={styles.ratingRow}>
+                  <Text style={styles.ratingLabel}>Rate:</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.ratingButton,
+                      item.rating === 'up' && styles.ratingButtonActive,
+                    ]}
+                    onPress={() => handleRate(item.id, 'up')}
+                  >
+                    <Text style={[
+                      styles.ratingEmoji,
+                      item.rating === 'up' && styles.ratingEmojiActive,
+                    ]}>👍</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.ratingButton,
+                      item.rating === 'down' && styles.ratingButtonActiveDown,
+                    ]}
+                    onPress={() => handleRate(item.id, 'down')}
+                  >
+                    <Text style={[
+                      styles.ratingEmoji,
+                      item.rating === 'down' && styles.ratingEmojiActive,
+                    ]}>👎</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
               <View style={styles.buttonGroup}>
                 <Pressable
@@ -181,6 +229,35 @@ export default function RecommendationsScreen() {
       ) : (
         // Discover view
         <>
+          {/* Genre Filters */}
+          <View style={styles.pickerSection}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.genreRow}
+            >
+              {GENRES.map((genre) => (
+                <TouchableOpacity
+                  key={genre}
+                  style={[
+                    styles.genreChip,
+                    selectedGenres.includes(genre) && styles.genreChipActive,
+                  ]}
+                  onPress={() => toggleGenre(genre)}
+                >
+                  <Text
+                    style={[
+                      styles.genreChipText,
+                      selectedGenres.includes(genre) && styles.genreChipTextActive,
+                    ]}
+                  >
+                    {genre}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
           <Text style={styles.prompt}>What LA vibe are you feeling?</Text>
 
           <TextInput
@@ -203,6 +280,7 @@ export default function RecommendationsScreen() {
             )}
           </TouchableOpacity>
 
+          
           <FlatList
             data={items}
             keyExtractor={(item, idx) => idx.toString()}
@@ -246,9 +324,10 @@ export default function RecommendationsScreen() {
                         ) : (
                           <Text style={[
                             styles.saveButtonText,
+                            isAlreadySaved(item.title) && styles.savedButtonText,
                             pressed && !isAlreadySaved(item.title) && styles.saveButtonTextPressed,
                           ]}>
-                            {isAlreadySaved(item.title) ? 'Saved' : 'Save'}
+                            {isAlreadySaved(item.title) ? '✓ Saved' : 'Save'}
                           </Text>
                         )
                       }
@@ -338,6 +417,71 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
+  pickerSection: {
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  pickerLabel: {
+    color: '#9d4edd',
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  personalityRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  personalityChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 2,
+    borderWidth: 1,
+    borderColor: '#9d4edd',
+    backgroundColor: 'transparent',
+  },
+  personalityChipActive: {
+    backgroundColor: '#9d4edd',
+    borderColor: '#9d4edd',
+  },
+  personalityChipText: {
+    color: '#9d4edd',
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  personalityChipTextActive: {
+    color: '#fff',
+  },
+  genreRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingRight: 20,
+  },
+  genreChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 2,
+    borderWidth: 1,
+    borderColor: '#00f0ff',
+    backgroundColor: 'transparent',
+  },
+  genreChipActive: {
+    backgroundColor: '#00f0ff',
+    borderColor: '#00f0ff',
+  },
+  genreChipText: {
+    color: '#00f0ff',
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  genreChipTextActive: {
+    color: '#0a0a12',
+  },
   tabTextActive: {
     color: '#fff',
     fontWeight: '700',
@@ -384,7 +528,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 2,
   },
-  list: {
+    list: {
     flex: 1,
     marginTop: 20,
   },
@@ -416,6 +560,44 @@ const styles = StyleSheet.create({
     marginTop: 6,
     lineHeight: 22,
     fontStyle: 'italic',
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 8,
+  },
+  ratingLabel: {
+    color: '#9d4edd',
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  ratingButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#9d4edd',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  ratingButtonActive: {
+    backgroundColor: '#00f0ff',
+    borderColor: '#00f0ff',
+  },
+  ratingButtonActiveDown: {
+    backgroundColor: '#ff2e97',
+    borderColor: '#ff2e97',
+  },
+  ratingEmoji: {
+    fontSize: 16,
+    opacity: 0.6,
+  },
+  ratingEmojiActive: {
+    opacity: 1,
   },
   buttonGroup: {
     flexDirection: 'column',
@@ -462,6 +644,9 @@ const styles = StyleSheet.create({
   savedButton: {
     backgroundColor: '#ff2e97',
     borderColor: '#ff2e97',
+  },
+  savedButtonText: {
+    color: '#fff',
   },
   saveButtonText: {
     color: '#ff2e97',

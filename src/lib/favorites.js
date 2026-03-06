@@ -7,6 +7,7 @@ import {
   query,
   where,
   getDocs,
+  updateDoc,
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -73,5 +74,18 @@ export async function isFavorite(userId, title) {
   } catch (error) {
     console.error('Error checking favorite:', error);
     return { isSaved: false };
+  }
+}
+
+// Rate a favorite (thumbs up or down)
+export async function rateFavorite(favoriteId, rating) {
+  try {
+    await updateDoc(doc(db, 'favorites', favoriteId), {
+      rating: rating, // 'up' or 'down'
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Error rating favorite:', error);
+    return { success: false, error: error.message };
   }
 }
