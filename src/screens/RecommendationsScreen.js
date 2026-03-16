@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,89 +9,258 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  SafeAreaView,
   Alert,
   Linking,
-  ImageBackground,
+  Image,
+  Dimensions,
+  StatusBar,
+  Animated,
+  Modal,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { getRecommendations } from '../lib/aiClient';
+import { fetchContentDetails } from '../lib/tmdb';
 import { saveFavorite, getFavorites, removeFavorite, rateFavorite } from '../lib/favorites';
+import { colors, fonts } from '../theme/colors';
 
-// Hollywood sign at sunset
-const BG_IMAGE = 'https://images.unsplash.com/photo-1515896769750-31548aa180ed?w=800&q=80';
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const CARD_WIDTH = 120;
+const CARD_HEIGHT = 180;
+
+// The Dude loading phrases - just the classics
+const DUDE_LOADING_PHRASES = [
+  "The Dude abides...",
+  "Yeah, well, that's just, like, your opinion, man.",
+  "That rug really tied the room together.",
+];
+
+// Fallback poster image
+const FALLBACK_POSTER = 'https://via.placeholder.com/342x513/181818/666666?text=No+Poster';
+
+const CATEGORIES = [
+  { id: 'foryou', title: 'For You', query: 'personalized picks based on LA vibes' },
+  { id: 'trending', title: 'Trending in LA', query: 'popular movies and shows set in Los Angeles' },
+  { id: 'classics', title: 'LA Classics', query: 'classic films that define Los Angeles' },
+  { id: 'indie', title: 'Hidden Gems', query: 'indie films and underrated shows set in LA' },
+  { id: 'hollywood', title: 'Hollywood Stories', query: 'movies about the entertainment industry' },
+];
 
 const GENRES = ['Action', 'Comedy', 'Drama', 'Thriller', 'Romance', 'Sci-Fi', 'Horror'];
 
 export default function RecommendationsScreen() {
   const { user, signOut } = useAuth();
   const [query, setQuery] = useState('');
-  const [items, setItems] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [categoryContent, setCategoryContent] = useState({});
   const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [showSearch, setShowSearch] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
   const [savingId, setSavingId] = useState(null);
   const [selectedGenres, setSelectedGenres] = useState([]);
+  const [featuredItem, setFeaturedItem] = useState(null);
+  const [loadingPhrase, setLoadingPhrase] = useState(DUDE_LOADING_PHRASES[0]);
 
-  // Load favorites when screen opens
+  // Detail modal state
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+
+  // Animated value for loading phrase
+  const phraseOpacity = useRef(new Animated.Value(1)).current;
+
+  // Rotate through Cher phrases while loading
+  useEffect(() => {
+    let interval;
+    if (loadingCategories || loading) {
+      interval = setInterval(() => {
+        // Fade out
+        Animated.timing(phraseOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }).start(() => {
+          // Change phrase
+          setLoadingPhrase(
+            DUDE_LOADING_PHRASES[Math.floor(Math.random() * DUDE_LOADING_PHRASES.length)]
+          );
+          // Fade in
+          Animated.timing(phraseOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }).start();
+        });
+      }, 2500);
+    }
+    return () => clearInterval(interval);
+  }, [loadingCategories, loading]);
+
   useEffect(() => {
     loadFavorites();
+    loadCategoryContent();
   }, []);
 
   const loadFavorites = async () => {
     const result = await getFavorites(user.uid);
     if (result.success) {
-      setFavorites(result.favorites);
+      // Fetch posters for favorites
+      const favoritesWithPosters = await Promise.all(
+        result.favorites.map(async (fav) => {
+          const tmdbData = await fetchContentDetails(fav.title);
+          return {
+            ...fav,
+            poster: tmdbData.poster || FALLBACK_POSTER,
+            backdrop: tmdbData.backdrop,
+            year: tmdbData.year,
+            tmdbRating: tmdbData.rating,
+            overview: tmdbData.overview,
+          };
+        })
+      );
+      setFavorites(favoritesWithPosters);
     }
   };
 
-  const toggleGenre = (genre) => {
-    setSelectedGenres((prev) =>
-      prev.includes(genre)
-        ? prev.filter((g) => g !== genre)
-        : [...prev, genre]
-    );
+  const loadCategoryContent = async () => {
+    setLoadingCategories(true);
+    try {
+      // Load all categories
+      const content = {};
+      for (const cat of CATEGORIES) {
+        const recs = await getRecommendations(cat.query, { genres: [] });
+
+        // Fetch TMDB data for each recommendation
+        const recsWithPosters = await Promise.all(
+          recs.map(async (item) => {
+            const tmdbData = await fetchContentDetails(item.title);
+            return {
+              ...item,
+              poster: tmdbData.poster || FALLBACK_POSTER,
+              backdrop: tmdbData.backdrop,
+              year: tmdbData.year,
+              rating: tmdbData.rating,
+              overview: tmdbData.overview,
+            };
+          })
+        );
+
+        content[cat.id] = recsWithPosters;
+      }
+
+      // Set featured item from first category
+      if (content[CATEGORIES[0].id]?.length > 0) {
+        setFeaturedItem(content[CATEGORIES[0].id][0]);
+      }
+
+      setCategoryContent(content);
+    } catch (e) {
+      console.log('Error loading categories:', e);
+    } finally {
+      setLoadingCategories(false);
+    }
   };
 
-  const handleGet = async () => {
+  // Handle genre selection - triggers search immediately
+  const handleGenreSelect = async (genre) => {
+    const newSelected = selectedGenres.includes(genre)
+      ? selectedGenres.filter((g) => g !== genre)
+      : [...selectedGenres, genre];
+
+    setSelectedGenres(newSelected);
+
+    // If at least one genre is selected, trigger search
+    if (newSelected.length > 0) {
+      setLoading(true);
+      setShowSearch(true);
+      try {
+        const searchQuery = query.trim() || `${newSelected.join(' or ')} movies and shows`;
+        const recs = await getRecommendations(searchQuery, { genres: newSelected });
+
+        // Fetch TMDB data for search results
+        const recsWithPosters = await Promise.all(
+          recs.map(async (item) => {
+            const tmdbData = await fetchContentDetails(item.title);
+            return {
+              ...item,
+              poster: tmdbData.poster || FALLBACK_POSTER,
+              backdrop: tmdbData.backdrop,
+              year: tmdbData.year,
+              rating: tmdbData.rating,
+              overview: tmdbData.overview,
+            };
+          })
+        );
+
+        setSearchResults(recsWithPosters);
+      } catch (e) {
+        setSearchResults([{ title: 'Error', description: e.message }]);
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // No genres selected, go back to home
+      setShowSearch(false);
+      setSearchResults([]);
+    }
+  };
+
+  const handleSearch = async () => {
+    if (!query.trim() && selectedGenres.length === 0) return;
     setLoading(true);
+    setShowSearch(true);
     try {
-      const recs = await getRecommendations(query || 'something light and fun', {
-        genres: selectedGenres,
-      });
-      setItems(recs);
-      setShowFavorites(false);
+      const searchQuery = query.trim() || `${selectedGenres.join(' or ')} movies and shows`;
+      const recs = await getRecommendations(searchQuery, { genres: selectedGenres });
+
+      // Fetch TMDB data for search results
+      const recsWithPosters = await Promise.all(
+        recs.map(async (item) => {
+          const tmdbData = await fetchContentDetails(item.title);
+          return {
+            ...item,
+            poster: tmdbData.poster || FALLBACK_POSTER,
+            backdrop: tmdbData.backdrop,
+            year: tmdbData.year,
+            rating: tmdbData.rating,
+            overview: tmdbData.overview,
+          };
+        })
+      );
+
+      setSearchResults(recsWithPosters);
     } catch (e) {
-      setItems([{ title: 'Error', description: e.message }]);
+      setSearchResults([{ title: 'Error', description: e.message }]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSave = async (item, index) => {
-    setSavingId(index);
+  const handleSave = async (item) => {
+    setSavingId(item.title);
     const result = await saveFavorite(user.uid, item);
     if (result.success) {
-      Alert.alert('Saved!', `"${item.title}" added to your favorites.`);
-      loadFavorites(); // Refresh favorites list
+      Alert.alert('Far out.', `"${cleanTitle(item.title)}" is on your list, man.`);
+      loadFavorites();
     } else {
-      Alert.alert('Error', 'Could not save. Please try again.');
+      Alert.alert("That's a bummer, man", 'Couldn\'t save. Give it another shot.');
     }
     setSavingId(null);
   };
 
   const handleRemove = async (favoriteId, title) => {
     Alert.alert(
-      'Remove Favorite',
-      `Remove "${title}" from your favorites?`,
+      'This will not stand, man',
+      `Remove "${cleanTitle(title)}" from your list?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Nevermind', style: 'cancel' },
         {
           text: 'Remove',
           style: 'destructive',
           onPress: async () => {
             await removeFavorite(favoriteId);
             loadFavorites();
+            setShowDetailModal(false);
           },
         },
       ]
@@ -107,140 +276,396 @@ export default function RecommendationsScreen() {
     return favorites.some((fav) => fav.title === title);
   };
 
+  const getFavoriteId = (title) => {
+    const fav = favorites.find((f) => f.title === title);
+    return fav?.id;
+  };
+
+  const cleanTitle = (title) => {
+    return title.replace(/^(Movie|TV Show|TV):\s*/i, '').trim();
+  };
+
   const openTrailer = (title) => {
-    const searchQuery = encodeURIComponent(`${title} official trailer`);
+    const searchQuery = encodeURIComponent(`${cleanTitle(title)} official trailer`);
     const youtubeUrl = `https://www.youtube.com/results?search_query=${searchQuery}`;
     Linking.openURL(youtubeUrl);
   };
 
-  
-  return (
-    <ImageBackground
-      source={{ uri: BG_IMAGE }}
-      style={styles.background}
-      resizeMode="cover"
-    >
-      <View style={styles.overlay} />
-      <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Hey, {user?.name}!</Text>
-          <Text style={styles.title}>LA Cine</Text>
+  const openItemDetail = (item) => {
+    setSelectedItem(item);
+    setShowDetailModal(true);
+  };
+
+  const clearSearch = () => {
+    setShowSearch(false);
+    setQuery('');
+    setSearchResults([]);
+    setSelectedGenres([]);
+  };
+
+  // Loading Component with Cher phrases
+  const DudeLoading = ({ size = 'large' }) => (
+    <View style={styles.dudeLoadingContainer}>
+      <ActivityIndicator size={size} color={colors.primary} />
+      <Animated.Text style={[styles.dudeLoadingText, { opacity: phraseOpacity }]}>
+        {loadingPhrase}
+      </Animated.Text>
+    </View>
+  );
+
+  // Detail Modal Component
+  const DetailModal = () => {
+    if (!selectedItem) return null;
+
+    const isSaved = isAlreadySaved(selectedItem.title);
+    const favoriteId = getFavoriteId(selectedItem.title);
+
+    return (
+      <Modal
+        visible={showDetailModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowDetailModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Backdrop/Poster Image */}
+            <Image
+              source={{ uri: selectedItem.backdrop || selectedItem.poster || FALLBACK_POSTER }}
+              style={styles.modalImage}
+              resizeMode="cover"
+            />
+            <View style={styles.modalImageOverlay} />
+
+            {/* Close Button */}
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setShowDetailModal(false)}
+            >
+              <Text style={styles.modalCloseText}>X</Text>
+            </TouchableOpacity>
+
+            {/* Content */}
+            <View style={styles.modalInfo}>
+              <Text style={styles.modalTitle}>{cleanTitle(selectedItem.title)}</Text>
+
+              <View style={styles.modalMeta}>
+                {selectedItem.year && (
+                  <Text style={styles.modalYear}>{selectedItem.year}</Text>
+                )}
+                {selectedItem.rating && (
+                  <View style={styles.modalRatingBadge}>
+                    <Text style={styles.modalRatingText}>{selectedItem.rating}</Text>
+                  </View>
+                )}
+              </View>
+
+              {(selectedItem.description || selectedItem.overview) && (
+                <Text style={styles.modalDescription}>
+                  {selectedItem.description || selectedItem.overview}
+                </Text>
+              )}
+
+              {/* Action Buttons */}
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={styles.modalPlayButton}
+                  onPress={() => {
+                    openTrailer(selectedItem.title);
+                    setShowDetailModal(false);
+                  }}
+                >
+                  <Text style={styles.modalPlayButtonText}>Watch Trailer</Text>
+                </TouchableOpacity>
+
+                {isSaved ? (
+                  <TouchableOpacity
+                    style={styles.modalSecondaryButton}
+                    onPress={() => handleRemove(favoriteId, selectedItem.title)}
+                  >
+                    <Text style={styles.modalSecondaryButtonText}>Remove from List</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.modalSecondaryButton}
+                    onPress={() => {
+                      handleSave(selectedItem);
+                      setShowDetailModal(false);
+                    }}
+                    disabled={savingId === selectedItem.title}
+                  >
+                    {savingId === selectedItem.title ? (
+                      <ActivityIndicator color={colors.text} size="small" />
+                    ) : (
+                      <Text style={styles.modalSecondaryButtonText}>+ Add to My List</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </View>
         </View>
-        <TouchableOpacity onPress={signOut} style={styles.signOutButton}>
-          <Text style={styles.signOutText}>Sign Out</Text>
-        </TouchableOpacity>
-      </View>
+      </Modal>
+    );
+  };
 
-      {/* Tab buttons */}
-      <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tab, !showFavorites && styles.tabActive]}
-          onPress={() => setShowFavorites(false)}
-        >
-          <Text style={[styles.tabText, !showFavorites && styles.tabTextActive]}>
-            Discover
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, showFavorites && styles.tabActive]}
-          onPress={() => setShowFavorites(true)}
-        >
-          <Text style={[styles.tabText, showFavorites && styles.tabTextActive]}>
-            Favorites ({favorites.length})
-          </Text>
-        </TouchableOpacity>
-      </View>
+  // Movie/TV Card Component
+  const ContentCard = ({ item, index, showActions = true }) => (
+    <Pressable
+      style={({ pressed }) => [
+        styles.card,
+        pressed && styles.cardPressed,
+      ]}
+      onPress={() => openItemDetail(item)}
+    >
+      <Image
+        source={{ uri: item.poster || FALLBACK_POSTER }}
+        style={styles.cardImage}
+        resizeMode="cover"
+      />
+      {item.rating && (
+        <View style={styles.ratingBadge}>
+          <Text style={styles.ratingBadgeText}>{item.rating}</Text>
+        </View>
+      )}
+      {item.year && (
+        <View style={styles.yearBadge}>
+          <Text style={styles.yearBadgeText}>{item.year}</Text>
+        </View>
+      )}
+      {isAlreadySaved(item.title) && (
+        <View style={styles.savedBadge}>
+          <Text style={styles.savedBadgeText}>In My List</Text>
+        </View>
+      )}
+    </Pressable>
+  );
 
-      {showFavorites ? (
-        // Favorites view
+  // Category Row Component
+  const CategoryRow = ({ category }) => {
+    const items = categoryContent[category.id] || [];
+
+    if (items.length === 0) return null;
+
+    return (
+      <View style={styles.categoryRow}>
+        <Text style={styles.categoryTitle}>{category.title}</Text>
+        <FlatList
+          horizontal
+          data={items}
+          keyExtractor={(item, idx) => `${category.id}-${idx}`}
+          renderItem={({ item, index }) => (
+            <ContentCard item={item} index={index} />
+          )}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryList}
+        />
+      </View>
+    );
+  };
+
+  // Favorites view
+  if (showFavorites) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" />
+        <DetailModal />
+
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setShowFavorites(false)}>
+            <Text style={styles.backButton}>Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>My List</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
         <FlatList
           data={favorites}
           keyExtractor={(item) => item.id}
+          numColumns={3}
           renderItem={({ item }) => (
-            <View style={styles.item}>
-              <View style={styles.itemContent}>
-                <Text style={styles.itemTitle}>{item.title}</Text>
-                {item.description ? (
-                  <Text style={styles.itemDesc}>{item.description}</Text>
-                ) : null}
-                {/* Rating buttons */}
-                <View style={styles.ratingRow}>
-                  <Text style={styles.ratingLabel}>Rate:</Text>
-                  <TouchableOpacity
-                    style={[
-                      styles.ratingButton,
-                      item.rating === 'up' && styles.ratingButtonActive,
-                    ]}
-                    onPress={() => handleRate(item.id, 'up')}
-                  >
-                    <Text style={[
-                      styles.ratingEmoji,
-                      item.rating === 'up' && styles.ratingEmojiActive,
-                    ]}>👍</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.ratingButton,
-                      item.rating === 'down' && styles.ratingButtonActiveDown,
-                    ]}
-                    onPress={() => handleRate(item.id, 'down')}
-                  >
-                    <Text style={[
-                      styles.ratingEmoji,
-                      item.rating === 'down' && styles.ratingEmojiActive,
-                    ]}>👎</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-              <View style={styles.buttonGroup}>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.cardButton,
-                    styles.trailerButton,
-                    pressed && styles.trailerButtonPressed,
-                  ]}
-                  onPress={() => openTrailer(item.title)}
-                >
-                  {({ pressed }) => (
-                    <Text style={[styles.trailerButtonText, pressed && styles.trailerButtonTextPressed]}>
-                      Trailer
-                    </Text>
-                  )}
-                </Pressable>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.cardButton,
-                    styles.removeButton,
-                    pressed && styles.removeButtonPressed,
-                  ]}
-                  onPress={() => handleRemove(item.id, item.title)}
-                >
-                  {({ pressed }) => (
-                    <Text style={[styles.removeButtonText, pressed && styles.removeButtonTextPressed]}>
-                      Remove
-                    </Text>
-                  )}
-                </Pressable>
-              </View>
-            </View>
+            <Pressable
+              style={styles.favoriteCard}
+              onPress={() => openItemDetail(item)}
+            >
+              <Image
+                source={{ uri: item.poster || FALLBACK_POSTER }}
+                style={styles.favoriteImage}
+                resizeMode="cover"
+              />
+            </Pressable>
           )}
-          style={styles.list}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={styles.favoritesGrid}
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No favorites yet!</Text>
+              <Text style={styles.emptyTitle}>Your list is empty</Text>
               <Text style={styles.emptySubtext}>
-                Get some recommendations and tap the heart to save them.
+                Tap on any title to see details and add it to your list
               </Text>
             </View>
           }
         />
+      </View>
+    );
+  }
+
+  // Search results view
+  if (showSearch) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" />
+        <DetailModal />
+
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={clearSearch}>
+            <Text style={styles.backButton}>Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>
+            {selectedGenres.length > 0 ? selectedGenres.join(', ') : 'Search Results'}
+          </Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        {loading ? (
+          <DudeLoading />
+        ) : (
+          <FlatList
+            data={searchResults}
+            keyExtractor={(item, idx) => idx.toString()}
+            renderItem={({ item, index }) => (
+              <Pressable
+                style={styles.searchResultItem}
+                onPress={() => openItemDetail(item)}
+              >
+                <Image
+                  source={{ uri: item.poster || FALLBACK_POSTER }}
+                  style={styles.searchResultImage}
+                  resizeMode="cover"
+                />
+                <View style={styles.searchResultContent}>
+                  <Text style={styles.searchResultTitle}>{cleanTitle(item.title)}</Text>
+                  {item.year && (
+                    <Text style={styles.searchResultYear}>{item.year}</Text>
+                  )}
+                  {item.description && (
+                    <Text style={styles.searchResultDesc} numberOfLines={3}>
+                      {item.description}
+                    </Text>
+                  )}
+                </View>
+              </Pressable>
+            )}
+            contentContainerStyle={styles.searchResultsList}
+          />
+        )}
+      </View>
+    );
+  }
+
+  // Main home view
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      <DetailModal />
+
+      {loadingCategories ? (
+        <View style={styles.fullScreenLoading}>
+          <Text style={styles.loadingLogo}>LA CINE</Text>
+          <DudeLoading />
+        </View>
       ) : (
-        // Discover view
-        <>
-          {/* Genre Filters */}
-          <View style={styles.pickerSection}>
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Hero Section */}
+          {featuredItem && (
+            <Pressable
+              style={styles.hero}
+              onPress={() => openItemDetail(featuredItem)}
+            >
+              <Image
+                source={{ uri: featuredItem.backdrop || featuredItem.poster || FALLBACK_POSTER }}
+                style={styles.heroImage}
+                resizeMode="cover"
+              />
+              <View style={styles.heroGradient}>
+                <View style={styles.heroContent}>
+                  <Text style={styles.heroTitle}>
+                    {cleanTitle(featuredItem.title)}
+                  </Text>
+                  {featuredItem.year && (
+                    <Text style={styles.heroYear}>{featuredItem.year}</Text>
+                  )}
+                  {featuredItem.description && (
+                    <Text style={styles.heroDescription} numberOfLines={2}>
+                      {featuredItem.description}
+                    </Text>
+                  )}
+                  <View style={styles.heroButtons}>
+                    <TouchableOpacity
+                      style={styles.playButton}
+                      onPress={() => openTrailer(featuredItem.title)}
+                    >
+                      <Text style={styles.playButtonText}>Watch Trailer</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.listButton}
+                      onPress={() => handleSave(featuredItem)}
+                    >
+                      <Text style={styles.listButtonText}>+ My List</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </Pressable>
+          )}
+
+          {/* Floating Header */}
+          <View style={styles.floatingHeader}>
+            <Text style={styles.logo}>LA CINE</Text>
+            <View style={styles.headerRight}>
+              <TouchableOpacity
+                style={styles.headerButton}
+                onPress={() => setShowFavorites(true)}
+              >
+                <Text style={styles.headerButtonText}>My List</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.profileButton}
+                onPress={signOut}
+              >
+                <Text style={styles.profileInitial}>
+                  {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Search Bar */}
+          <View style={styles.searchSection}>
+            <View style={styles.searchBar}>
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Search LA movies & shows..."
+                placeholderTextColor={colors.textMuted}
+                style={styles.searchInput}
+                onSubmitEditing={handleSearch}
+                returnKeyType="search"
+              />
+              {loading ? (
+                <ActivityIndicator color={colors.primary} size="small" />
+              ) : (
+                <TouchableOpacity onPress={handleSearch}>
+                  <Text style={styles.searchIcon}>Search</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Genre Pills */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -250,15 +675,15 @@ export default function RecommendationsScreen() {
                 <TouchableOpacity
                   key={genre}
                   style={[
-                    styles.genreChip,
-                    selectedGenres.includes(genre) && styles.genreChipActive,
+                    styles.genrePill,
+                    selectedGenres.includes(genre) && styles.genrePillActive,
                   ]}
-                  onPress={() => toggleGenre(genre)}
+                  onPress={() => handleGenreSelect(genre)}
                 >
                   <Text
                     style={[
-                      styles.genreChipText,
-                      selectedGenres.includes(genre) && styles.genreChipTextActive,
+                      styles.genrePillText,
+                      selectedGenres.includes(genre) && styles.genrePillTextActive,
                     ]}
                   >
                     {genre}
@@ -268,448 +693,534 @@ export default function RecommendationsScreen() {
             </ScrollView>
           </View>
 
-          <Text style={styles.prompt}>What LA vibe are you feeling?</Text>
+          {/* Category Rows */}
+          {CATEGORIES.map((category) => (
+            <CategoryRow key={category.id} category={category} />
+          ))}
 
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="e.g. beach vibes, Hollywood drama, noir..."
-            placeholderTextColor="#666"
-            style={styles.input}
-          />
-
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleGet}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Get Suggestions</Text>
-            )}
-          </TouchableOpacity>
-
-          
-          <FlatList
-            data={items}
-            keyExtractor={(item, idx) => idx.toString()}
-            renderItem={({ item, index }) => (
-              <View style={styles.item}>
-                <View style={styles.itemContent}>
-                  <Text style={styles.itemTitle}>{item.title}</Text>
-                  {item.description ? (
-                    <Text style={styles.itemDesc}>{item.description}</Text>
-                  ) : null}
-                </View>
-                {!['Error', 'Ugh, as if!', 'Whatever!', "I'm totally buggin'!", 'Way harsh, Tai'].includes(item.title) && (
-                  <View style={styles.buttonGroup}>
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.cardButton,
-                        styles.trailerButton,
-                        pressed && styles.trailerButtonPressed,
-                      ]}
-                      onPress={() => openTrailer(item.title)}
-                    >
-                      {({ pressed }) => (
-                        <Text style={[styles.trailerButtonText, pressed && styles.trailerButtonTextPressed]}>
-                          Trailer
-                        </Text>
-                      )}
-                    </Pressable>
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.cardButton,
-                        styles.saveButton,
-                        isAlreadySaved(item.title) && styles.savedButton,
-                        pressed && !isAlreadySaved(item.title) && styles.saveButtonPressed,
-                      ]}
-                      onPress={() => handleSave(item, index)}
-                      disabled={savingId === index || isAlreadySaved(item.title)}
-                    >
-                      {({ pressed }) =>
-                        savingId === index ? (
-                          <ActivityIndicator color="#fff" size="small" />
-                        ) : (
-                          <Text style={[
-                            styles.saveButtonText,
-                            isAlreadySaved(item.title) && styles.savedButtonText,
-                            pressed && !isAlreadySaved(item.title) && styles.saveButtonTextPressed,
-                          ]}>
-                            {isAlreadySaved(item.title) ? '✓ Saved' : 'Save'}
-                          </Text>
-                        )
-                      }
-                    </Pressable>
-                  </View>
-                )}
+          {/* Favorites Row */}
+          {favorites.length > 0 && (
+            <View style={styles.categoryRow}>
+              <View style={styles.categoryHeader}>
+                <Text style={styles.categoryTitle}>My List</Text>
+                <TouchableOpacity onPress={() => setShowFavorites(true)}>
+                  <Text style={styles.seeAllButton}>See All</Text>
+                </TouchableOpacity>
               </View>
-            )}
-            style={styles.list}
-            contentContainerStyle={styles.listContent}
-          />
-        </>
+              <FlatList
+                horizontal
+                data={favorites.slice(0, 10)}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item, index }) => (
+                  <ContentCard
+                    item={item}
+                    index={index}
+                    showActions={false}
+                  />
+                )}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categoryList}
+              />
+            </View>
+          )}
+
+          <View style={styles.bottomSpacer} />
+        </ScrollView>
       )}
-      </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  background: {
-    flex: 1,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(10, 10, 18, 0.7)',
-  },
   container: {
     flex: 1,
+    backgroundColor: colors.background,
   },
-  header: {
+  scrollView: {
+    flex: 1,
+  },
+
+  // Full screen loading
+  fullScreenLoading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingLogo: {
+    fontFamily: fonts.heading,
+    fontSize: 48,
+    color: colors.primary,
+    letterSpacing: 6,
+    marginBottom: 40,
+  },
+
+  // Dude Loading
+  dudeLoadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+  },
+  dudeLoadingText: {
+    fontFamily: fonts.regular,
+    color: colors.textSecondary,
+    fontSize: 18,
+    marginTop: 20,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+  },
+
+  // Floating Header
+  floatingHeader: {
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    padding: 20,
-    paddingTop: 16,
-  },
-  greeting: {
-    fontSize: 12,
-    color: '#9d4edd',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '300',
-    color: '#00f0ff',
-    letterSpacing: 3,
-    textTransform: 'uppercase',
-    textShadowColor: '#00f0ff',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
-  },
-  signOutButton: {
-    paddingVertical: 8,
+    alignItems: 'center',
     paddingHorizontal: 16,
-    backgroundColor: 'transparent',
-    borderRadius: 2,
-    borderWidth: 1,
-    borderColor: '#9d4edd',
+    zIndex: 10,
   },
-  signOutText: {
-    color: '#ff2e97',
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+  logo: {
+    fontFamily: fonts.heading,
+    fontSize: 32,
+    color: colors.primary,
+    letterSpacing: 3,
   },
-  tabs: {
+  headerRight: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 16,
+    alignItems: 'center',
     gap: 12,
   },
-  tab: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 2,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#9d4edd',
+  headerButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
   },
-  tabActive: {
-    backgroundColor: '#ff2e97',
-    borderColor: '#ff2e97',
-    shadowColor: '#ff2e97',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
+  headerButtonText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '500',
   },
-  tabText: {
-    color: '#9d4edd',
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+  profileButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  pickerSection: {
-    paddingHorizontal: 20,
-    marginBottom: 12,
+  profileInitial: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '700',
   },
-  pickerLabel: {
-    color: '#9d4edd',
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+
+  // Hero
+  hero: {
+    height: 500,
+    position: 'relative',
+  },
+  heroImage: {
+    width: '100%',
+    height: '100%',
+  },
+  heroGradient: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+  },
+  heroContent: {
+    padding: 20,
+    paddingBottom: 30,
+    backgroundColor: 'rgba(12,12,12,0.7)',
+  },
+  heroTitle: {
+    fontFamily: fonts.heading,
+    fontSize: 36,
+    color: colors.text,
+    letterSpacing: 2,
+    marginBottom: 4,
+  },
+  heroYear: {
+    fontSize: 14,
+    color: colors.textSecondary,
     marginBottom: 8,
   },
-  personalityRow: {
+  heroDescription: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  heroButtons: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
   },
-  personalityChip: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 2,
-    borderWidth: 1,
-    borderColor: '#9d4edd',
-    backgroundColor: 'transparent',
+  playButton: {
+    backgroundColor: colors.text,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  personalityChipActive: {
-    backgroundColor: '#9d4edd',
-    borderColor: '#9d4edd',
-  },
-  personalityChipText: {
-    color: '#9d4edd',
-    fontSize: 12,
-    fontWeight: '600',
+  playButtonText: {
+    fontFamily: fonts.medium,
+    color: colors.background,
+    fontSize: 15,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  personalityChipTextActive: {
-    color: '#fff',
+  listButton: {
+    backgroundColor: colors.surfaceLight,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 4,
+  },
+  listButtonText: {
+    fontFamily: fonts.medium,
+    color: colors.text,
+    fontSize: 15,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+
+  // Search Section
+  searchSection: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 10,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  searchInput: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 16,
+  },
+  searchIcon: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
   },
   genreRow: {
     flexDirection: 'row',
     gap: 8,
-    paddingRight: 20,
+    paddingRight: 16,
   },
-  genreChip: {
+  genrePill: {
     paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 2,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#00f0ff',
-    backgroundColor: 'transparent',
+    borderColor: colors.surfaceLight,
   },
-  genreChipActive: {
-    backgroundColor: '#00f0ff',
-    borderColor: '#00f0ff',
+  genrePillActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
-  genreChipText: {
-    color: '#00f0ff',
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
+  genrePillText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  genrePillTextActive: {
+    color: colors.text,
+  },
+
+  // Category Rows
+  categoryRow: {
+    marginTop: 24,
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  categoryTitle: {
+    fontFamily: fonts.heading,
+    fontSize: 24,
+    color: colors.text,
     letterSpacing: 1,
+    paddingHorizontal: 16,
+    marginBottom: 12,
   },
-  genreChipTextActive: {
-    color: '#0a0a12',
+  seeAllButton: {
+    color: colors.textSecondary,
+    fontSize: 13,
   },
-  tabTextActive: {
-    color: '#fff',
+  categoryList: {
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+
+  // Content Cards
+  card: {
+    width: CARD_WIDTH,
+    marginRight: 10,
+  },
+  cardPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.98 }],
+  },
+  cardImage: {
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
+    borderRadius: 6,
+    backgroundColor: colors.surface,
+  },
+  ratingBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: colors.gold,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 3,
+  },
+  ratingBadgeText: {
+    color: colors.background,
+    fontSize: 10,
     fontWeight: '700',
   },
-  prompt: {
-    color: '#00f0ff',
-    fontSize: 14,
-    fontWeight: '400',
-    paddingHorizontal: 20,
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
+  yearBadge: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 3,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#9d4edd',
-    padding: 14,
-    borderRadius: 2,
-    marginHorizontal: 20,
-    marginBottom: 12,
-    backgroundColor: '#0a0a12',
-    color: '#e5e5e5',
-    fontSize: 16,
+  yearBadgeText: {
+    color: colors.text,
+    fontSize: 10,
+    fontWeight: '500',
   },
-  button: {
-    backgroundColor: '#ff2e97',
-    padding: 16,
-    borderRadius: 2,
+  savedBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 3,
+  },
+  savedBadgeText: {
+    color: colors.text,
+    fontSize: 9,
+    fontWeight: '600',
+  },
+
+  // Detail Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: SCREEN_HEIGHT * 0.85,
+    overflow: 'hidden',
+  },
+  modalImage: {
+    width: '100%',
+    height: 250,
+  },
+  modalImageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    height: 250,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems: 'center',
-    marginHorizontal: 20,
-    shadowColor: '#ff2e97',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
+    justifyContent: 'center',
   },
-  buttonDisabled: {
-    backgroundColor: '#333',
-    shadowOpacity: 0,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-  },
-    list: {
-    flex: 1,
-    marginTop: 20,
-  },
-  listContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  item: {
-    padding: 16,
-    backgroundColor: '#141428',
-    borderRadius: 2,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    borderWidth: 1,
-    borderColor: '#9d4edd',
-  },
-  itemContent: {
-    flex: 1,
-  },
-  itemTitle: {
-    fontWeight: '600',
+  modalCloseText: {
+    color: colors.text,
     fontSize: 16,
-    color: '#00f0ff',
-    letterSpacing: 0.5,
+    fontWeight: '600',
   },
-  itemDesc: {
-    color: '#ccc',
-    marginTop: 6,
+  modalInfo: {
+    padding: 20,
+  },
+  modalTitle: {
+    fontFamily: fonts.heading,
+    fontSize: 32,
+    color: colors.text,
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  modalMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  modalYear: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  modalRatingBadge: {
+    backgroundColor: colors.gold,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  modalRatingText: {
+    color: colors.background,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  modalDescription: {
+    fontSize: 15,
+    color: colors.textSecondary,
     lineHeight: 22,
-    fontStyle: 'italic',
+    marginBottom: 24,
   },
-  ratingRow: {
-    flexDirection: 'row',
+  modalButtons: {
+    gap: 12,
+  },
+  modalPlayButton: {
+    backgroundColor: colors.text,
+    paddingVertical: 14,
+    borderRadius: 6,
     alignItems: 'center',
-    marginTop: 12,
-    gap: 8,
   },
-  ratingLabel: {
-    color: '#9d4edd',
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  ratingButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#9d4edd',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
-  },
-  ratingButtonActive: {
-    backgroundColor: '#00f0ff',
-    borderColor: '#00f0ff',
-  },
-  ratingButtonActiveDown: {
-    backgroundColor: '#ff2e97',
-    borderColor: '#ff2e97',
-  },
-  ratingEmoji: {
+  modalPlayButtonText: {
+    fontFamily: fonts.medium,
+    color: colors.background,
     fontSize: 16,
-    opacity: 0.6,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
-  ratingEmojiActive: {
-    opacity: 1,
-  },
-  buttonGroup: {
-    flexDirection: 'column',
-    gap: 8,
-    marginLeft: 12,
-  },
-  cardButton: {
-    width: 80,
-    paddingVertical: 8,
-    borderRadius: 2,
+  modalSecondaryButton: {
+    backgroundColor: colors.surfaceLight,
+    paddingVertical: 14,
+    borderRadius: 6,
     alignItems: 'center',
+  },
+  modalSecondaryButtonText: {
+    fontFamily: fonts.medium,
+    color: colors.text,
+    fontSize: 16,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+
+  // Search Results
+  searchResultsList: {
+    padding: 16,
+  },
+  searchResultItem: {
+    flexDirection: 'row',
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  searchResultImage: {
+    width: 100,
+    height: 150,
+  },
+  searchResultContent: {
+    flex: 1,
+    padding: 12,
     justifyContent: 'center',
   },
-  trailerButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#00f0ff',
-  },
-  trailerButtonPressed: {
-    backgroundColor: '#00f0ff',
-  },
-  trailerButtonText: {
-    color: '#00f0ff',
-    fontSize: 12,
+  searchResultTitle: {
+    fontSize: 16,
     fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    textAlign: 'center',
+    color: colors.text,
+    marginBottom: 4,
   },
-  trailerButtonTextPressed: {
-    color: '#0a0a12',
-  },
-  saveButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#ff2e97',
-  },
-  saveButtonPressed: {
-    backgroundColor: '#ff2e97',
-  },
-  saveButtonTextPressed: {
-    color: '#fff',
-  },
-  savedButton: {
-    backgroundColor: '#ff2e97',
-    borderColor: '#ff2e97',
-  },
-  savedButtonText: {
-    color: '#fff',
-  },
-  saveButtonText: {
-    color: '#ff2e97',
+  searchResultYear: {
     fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    textAlign: 'center',
+    color: colors.textMuted,
+    marginBottom: 6,
   },
-  removeButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#ff2e97',
+  searchResultDesc: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 18,
   },
-  removeButtonPressed: {
-    backgroundColor: '#ff2e97',
+
+  // Favorites Grid
+  favoritesGrid: {
+    padding: 16,
   },
-  removeButtonText: {
-    color: '#ff2e97',
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    textAlign: 'center',
+  favoriteCard: {
+    width: (SCREEN_WIDTH - 48) / 3,
+    marginRight: 8,
+    marginBottom: 16,
   },
-  removeButtonTextPressed: {
-    color: '#fff',
+  favoriteImage: {
+    width: '100%',
+    aspectRatio: 2/3,
+    borderRadius: 6,
+    backgroundColor: colors.surface,
   },
-  emptyState: {
+
+  // Header for sub-screens
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: 60,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    backgroundColor: colors.background,
+  },
+  backButton: {
+    color: colors.text,
+    fontSize: 16,
+  },
+  headerTitle: {
+    fontFamily: fonts.heading,
+    color: colors.text,
+    fontSize: 24,
+    letterSpacing: 1,
+  },
+
+  // Empty States
+  emptyState: {
+    alignItems: 'center',
+    paddingTop: 100,
     paddingHorizontal: 40,
   },
-  emptyText: {
-    color: '#00f0ff',
-    fontSize: 16,
-    fontWeight: '400',
+  emptyTitle: {
+    fontFamily: fonts.heading,
+    color: colors.text,
+    fontSize: 28,
+    letterSpacing: 1,
     marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
   },
   emptySubtext: {
-    color: '#9d4edd',
+    color: colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
-    lineHeight: 22,
-    fontStyle: 'italic',
+    lineHeight: 20,
+  },
+
+  bottomSpacer: {
+    height: 40,
   },
 });

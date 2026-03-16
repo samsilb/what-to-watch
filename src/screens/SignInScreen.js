@@ -9,12 +9,16 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  ImageBackground,
+  Image,
+  Dimensions,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { colors, fonts } from '../theme/colors';
 
-// LA skyline at night with palm trees
-const BG_IMAGE = 'https://images.unsplash.com/photo-1580655653885-65763b2597d0?w=800&q=80';
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// LA skyline background
+const BG_IMAGE = 'https://images.unsplash.com/photo-1534190760961-74e8c1c5c3da?w=1200&q=80';
 
 export default function SignInScreen() {
   const [email, setEmail] = useState('');
@@ -43,168 +47,219 @@ export default function SignInScreen() {
     if (!result.success) {
       Alert.alert('Error', result.error);
     }
-    // If successful, AuthContext will update and App.js will navigate automatically
   };
 
   return (
-    <ImageBackground
-      source={{ uri: BG_IMAGE }}
-      style={styles.background}
-      resizeMode="cover"
-    >
+    <View style={styles.container}>
+      {/* Background Image */}
+      <Image
+        source={{ uri: BG_IMAGE }}
+        style={styles.backgroundImage}
+        resizeMode="cover"
+      />
       <View style={styles.overlay} />
+
       <KeyboardAvoidingView
         behavior={Platform.select({ ios: 'padding', android: undefined })}
-        style={styles.container}
+        style={styles.content}
       >
-        <View style={styles.card}>
-        <Text style={styles.title}>LA Cine</Text>
-        <Text style={styles.tagline}>Movies & TV set in the City of Angels</Text>
-        <Text style={styles.subtitle}>
-          {isSignUp ? 'Create an account' : 'Sign in to continue'}
-        </Text>
-
-        <TextInput
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          style={styles.input}
-          editable={!loading}
-        />
-
-        <TextInput
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          style={styles.input}
-          editable={!loading}
-        />
-
-        <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>
-              {isSignUp ? 'Create Account' : 'Sign In'}
-            </Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => setIsSignUp(!isSignUp)}
-          style={styles.switchButton}
-          disabled={loading}
-        >
-          <Text style={styles.switchText}>
-            {isSignUp
-              ? 'Already have an account? Sign In'
-              : "Don't have an account? Sign Up"}
-          </Text>
-        </TouchableOpacity>
+        {/* Logo */}
+        <View style={styles.logoContainer}>
+          <Text style={styles.logo}>LA CINE</Text>
+          <Text style={styles.tagline}>Discover LA through film</Text>
         </View>
+
+        {/* Form Card */}
+        <View style={styles.formCard}>
+          <Text style={styles.formTitle}>
+            {isSignUp ? 'Create Account' : 'Sign In'}
+          </Text>
+
+          <TextInput
+            placeholder="Email"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            style={styles.input}
+            placeholderTextColor={colors.textMuted}
+            editable={!loading}
+          />
+
+          <TextInput
+            placeholder="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            style={styles.input}
+            placeholderTextColor={colors.textMuted}
+            editable={!loading}
+          />
+
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleSubmit}
+            disabled={loading}
+            activeOpacity={0.8}
+          >
+            {loading ? (
+              <ActivityIndicator color={colors.text} />
+            ) : (
+              <Text style={styles.buttonText}>
+                {isSignUp ? 'Get Started' : 'Sign In'}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <TouchableOpacity
+            onPress={() => setIsSignUp(!isSignUp)}
+            style={styles.switchButton}
+            disabled={loading}
+          >
+            <Text style={styles.switchText}>
+              {isSignUp
+                ? 'Already have an account? '
+                : 'New to LA Cine? '}
+              <Text style={styles.switchTextBold}>
+                {isSignUp ? 'Sign In' : 'Sign Up'}
+              </Text>
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Footer */}
+        <Text style={styles.footer}>
+          AI-powered recommendations for movies & TV set in Los Angeles
+        </Text>
       </KeyboardAvoidingView>
-    </ImageBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  background: {
+  container: {
     flex: 1,
+    backgroundColor: colors.background,
+  },
+  backgroundImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(10, 10, 18, 0.65)',
+    backgroundColor: 'rgba(12, 12, 12, 0.75)',
   },
-  container: {
+  content: {
     flex: 1,
     justifyContent: 'center',
-    padding: 16,
+    paddingHorizontal: 24,
   },
-  card: {
-    backgroundColor: '#141428',
-    padding: 24,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#ff2e97',
-    shadowColor: '#ff2e97',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
+
+  // Logo
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
   },
-  title: {
-    fontSize: 36,
-    fontWeight: '300',
-    marginBottom: 4,
-    textAlign: 'center',
-    color: '#00f0ff',
-    letterSpacing: 4,
-    textTransform: 'uppercase',
-    textShadowColor: '#00f0ff',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
+  logo: {
+    fontFamily: fonts.heading,
+    fontSize: 64,
+    color: colors.primary,
+    letterSpacing: 6,
   },
   tagline: {
-    fontSize: 12,
-    color: '#ff2e97',
-    textAlign: 'center',
-    marginBottom: 8,
-    fontStyle: 'italic',
+    fontFamily: fonts.regular,
+    fontSize: 16,
+    color: colors.textSecondary,
+    marginTop: 8,
     letterSpacing: 2,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#9d4edd',
-    textAlign: 'center',
-    marginBottom: 24,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+  },
+
+  // Form
+  formCard: {
+    backgroundColor: 'rgba(24, 24, 24, 0.9)',
+    borderRadius: 8,
+    padding: 24,
+  },
+  formTitle: {
+    fontFamily: fonts.heading,
+    fontSize: 32,
+    color: colors.text,
+    letterSpacing: 2,
+    marginBottom: 24,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#9d4edd',
-    padding: 14,
-    borderRadius: 2,
-    marginBottom: 12,
-    backgroundColor: '#0a0a12',
-    color: '#e5e5e5',
+    backgroundColor: colors.surfaceLight,
+    borderRadius: 4,
+    padding: 16,
+    marginBottom: 16,
+    color: colors.text,
     fontSize: 16,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   button: {
-    backgroundColor: '#ff2e97',
+    backgroundColor: colors.primary,
     padding: 16,
-    borderRadius: 2,
+    borderRadius: 4,
     alignItems: 'center',
     marginTop: 8,
-    shadowColor: '#ff2e97',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
   },
   buttonDisabled: {
-    backgroundColor: '#333',
-    shadowOpacity: 0,
+    backgroundColor: colors.surfaceLight,
   },
   buttonText: {
-    color: '#fff',
+    fontFamily: fonts.medium,
+    color: colors.text,
     fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: 2,
     textTransform: 'uppercase',
+    letterSpacing: 2,
   },
+
+  // Divider
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 24,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.surfaceLight,
+  },
+  dividerText: {
+    color: colors.textMuted,
+    paddingHorizontal: 16,
+    fontSize: 13,
+  },
+
+  // Switch
   switchButton: {
-    marginTop: 20,
     alignItems: 'center',
   },
   switchText: {
-    color: '#00f0ff',
+    color: colors.textSecondary,
+    fontSize: 14,
+  },
+  switchTextBold: {
+    color: colors.text,
+    fontWeight: '600',
+  },
+
+  // Footer
+  footer: {
+    textAlign: 'center',
+    color: colors.textMuted,
     fontSize: 12,
-    letterSpacing: 1,
+    marginTop: 32,
+    paddingHorizontal: 20,
+    lineHeight: 18,
   },
 });
