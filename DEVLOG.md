@@ -124,6 +124,75 @@ Feature day! Added trailers, genre filters, and ratings. Iterated on design - re
 
 ---
 
+## Session 3 - March 16, 2026
+
+### The Vibe
+Major glow-up! Transformed the app from "cool side project" to "wait, is this a real streaming service?" Added real movie posters, cinematic fonts, and replaced Cher with The Dude. The app finally looks like it belongs on the App Store.
+
+### What We Built
+
+1. **Netflix-Style Streaming Redesign**
+   - Hero banner with featured movie at the top
+   - Horizontal scrolling carousels for each category
+   - Movie poster cards with ratings and year badges
+   - Dark theme with cinematic red accent (#e50914)
+   - "My List" section for saved favorites
+
+2. **TMDB API Integration**
+   - Real movie posters from The Movie Database API
+   - Actual ratings, release years, and plot summaries
+   - Backdrop images for hero section and detail modal
+   - Free API key from themoviedb.org
+
+3. **Detail Modal**
+   - Tap any movie to see full details (instead of going straight to trailer)
+   - Large backdrop image
+   - Title, year, rating, description
+   - "Watch Trailer" and "Add to My List" buttons
+   - Much more like a real streaming app experience
+
+4. **Cinematic Typography**
+   - Bebas Neue font for headings (big, bold, movie poster style)
+   - Oswald font for UI text and buttons
+   - Feels like a legit film app now
+
+5. **Big Lebowski Theme**
+   - Replaced Cher/Clueless quotes with The Dude
+   - Loading phrases: "The Dude abides...", "That rug really tied the room together."
+   - Save confirmation: "Far out." / "[Movie] is on your list, man."
+   - Remove prompt: "This will not stand, man"
+   - Error messages: "That's a bummer, man"
+
+6. **Fixed Genre Filters**
+   - Tapping a genre now triggers an immediate search
+   - Can combine multiple genres
+   - Deselecting all genres returns to home view
+
+### What We Changed Our Mind On
+- **Cher from Clueless** - Cute idea, but The Big Lebowski fits better for an LA movie app. More iconic, more quotable, more chill.
+- **Too many Dude quotes** - Started with 16 loading phrases, trimmed to 3 classics. Less is more.
+
+### Lessons Learned
+- **Real posters make a huge difference** - The app went from "prototype" to "polished" just by adding actual movie artwork.
+- **Fonts matter** - Bebas Neue gives instant "cinema" vibes. Typography is half the design.
+- **Modals improve UX** - Going straight to YouTube felt jarring. The detail modal creates a better flow.
+- **Theme consistency is key** - Once we committed to Lebowski, updating all the alerts/errors made the whole experience feel cohesive.
+
+### Commits Made
+1. `Redesign app as Netflix-style streaming UI with Big Lebowski theme`
+
+### Files Modified/Created
+- `App.js` - Font loading, themed loading screen
+- `src/theme/colors.js` - New color palette + font definitions
+- `src/lib/tmdb.js` - NEW: TMDB API client for posters
+- `src/lib/aiClient.js` - Lebowski error messages
+- `src/screens/RecommendationsScreen.js` - Complete redesign
+- `src/screens/SignInScreen.js` - New fonts and styling
+- `CLAUDE.md` - Updated theme documentation
+- `package.json` - Added expo-font and Google Fonts packages
+
+---
+
 ## Ideas for Future Sessions
 
 ### Stretch Features (Competition Differentiators)
@@ -136,11 +205,14 @@ Feature day! Added trailers, genre filters, and ratings. Iterated on design - re
 - [ ] Social features (see what friends are watching)
 
 ### Polish
-- [ ] Add animations/transitions
+- [x] Add animations/transitions ✅ (loading phrase fade, press states)
 - [ ] Loading skeletons
 - [ ] Pull to refresh
-- [ ] Better error handling UI
+- [x] Better error handling UI ✅ (Lebowski-themed errors)
 - [ ] App icon and splash screen
+- [x] Real movie posters ✅ (TMDB integration)
+- [x] Custom fonts ✅ (Bebas Neue + Oswald)
+- [x] Detail modal for movies ✅
 
 ---
 
@@ -151,5 +223,6 @@ Feature day! Added trailers, genre filters, and ratings. Iterated on design - re
 4. Scan QR code with Expo Go app on your phone
 
 ## API Keys Location
-- **Gemini:** `src/lib/aiClient.js` (line 3)
+- **Gemini:** `.env` (EXPO_PUBLIC_GOOGLE_API_KEY)
+- **TMDB:** `.env` (EXPO_PUBLIC_TMDB_API_KEY)
 - **Firebase:** `src/config/firebase.js` (lines 6-12)
