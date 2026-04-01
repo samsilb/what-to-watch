@@ -79,27 +79,27 @@ Respond ONLY with valid JSON in this exact format, no other text:
     return recommendations;
   } catch (error) {
     console.error('AI Error:', error);
-    // Return a Dude-style error message
-    const dudeErrors = [
+    // Return a Cher-style error message
+    const cherErrors = [
       {
-        title: 'This aggression will not stand, man',
-        description: "The recommendations are having a moment. The Dude suggests you try again.",
+        title: 'Ugh, as if!',
+        description: "The recommendations are totally buggin' right now. Try again?",
       },
       {
-        title: 'Obviously you\'re not a golfer',
-        description: "Something went wrong, man. Lotta ins, lotta outs. Give it another shot.",
+        title: 'Whatever!',
+        description: "Something went wrong. I know it seems like totally random, but give it another shot.",
       },
       {
-        title: 'The bar ate you',
-        description: "Sometimes you eat the bar, sometimes the bar eats you. This time it ate you. Try again?",
+        title: 'Way harsh, Tai',
+        description: "That was way harsh. The app is having a moment. Try again in a sec?",
       },
       {
-        title: 'That\'s a bummer, man',
-        description: "New information has come to light... and it's not good. The Dude recommends a retry.",
+        title: 'I totally paused!',
+        description: "Searching for movies is as useless as searching for meaning in a Pauly Shore movie right now. Retry?",
       },
     ];
-    // Pick a random Dude error
-    const randomError = dudeErrors[Math.floor(Math.random() * dudeErrors.length)];
+    // Pick a random Cher error
+    const randomError = cherErrors[Math.floor(Math.random() * cherErrors.length)];
     return [randomError];
   }
 }

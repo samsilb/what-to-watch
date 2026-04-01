@@ -193,6 +193,45 @@ Major glow-up! Transformed the app from "cool side project" to "wait, is this a 
 
 ---
 
+## Session 4 - April 1, 2026
+
+### The Vibe
+Theme switch! Swapped out The Big Lebowski for Clueless. The app now has major 90s Beverly Hills energy with hot pink and yellow accents. Cher Horowitz is officially our spirit guide.
+
+### What We Changed
+
+1. **Clueless Color Scheme**
+   - Dark burgundy background (#1a0a14) instead of pure black
+   - Hot pink primary accent (#ff69b4) - very Cher
+   - Yellow secondary accent (#ffeb3b) - from her iconic plaid outfit
+   - Pink-tinted secondary text (#e8b4d4) for that 90s glam vibe
+
+2. **Cher Loading Phrases**
+   - "As if!"
+   - "Ugh, I was like, totally buggin'..."
+   - "Whatever!"
+   - "I totally paused!"
+   - "Searching for a boy in high school is as useless as searching for meaning in a Pauly Shore movie."
+   - "You see how picky I am about my shoes, and they only go on my feet."
+
+3. **Clueless-Style Alerts**
+   - Save success: "Totally!" / "[Movie] is on your list. As if you'd forget!"
+   - Save error: "Ugh, as if!"
+   - Remove prompt: "Wait, are you sure?" / "That would be way harsh."
+
+### Why the Switch
+Clueless is THE iconic LA movie - set in Beverly Hills, all about the entertainment industry lifestyle, and has some of the most quotable lines ever. Plus it's a fun contrast to have a girly 90s aesthetic for a movie app. The Dude was cool, but Cher is iconic.
+
+### Commits Made
+1. `Switch theme from Big Lebowski to Clueless - Cher vibes`
+
+### Files Modified
+- `src/theme/colors.js` - New pink/yellow color palette
+- `src/screens/RecommendationsScreen.js` - Cher quotes and themed alerts
+- `CLAUDE.md` - Updated theme documentation
+
+---
+
 ## Ideas for Future Sessions
 
 ### Stretch Features (Competition Differentiators)

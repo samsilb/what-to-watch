@@ -18,8 +18,8 @@ function Navigation() {
     return (
       <View style={styles.loadingContainer}>
         <Text style={styles.loadingLogo}>LA CINE</Text>
-        <ActivityIndicator size="large" color="#e50914" />
-        <Text style={styles.loadingText}>The Dude abides...</Text>
+        <ActivityIndicator size="large" color="#ff69b4" />
+        <Text style={styles.loadingText}>As if!</Text>
       </View>
     );
   }
@@ -67,12 +67,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0c0c0c',
+    backgroundColor: '#1a0a14',
   },
   loadingLogo: {
     fontFamily: 'BebasNeue_400Regular',
     fontSize: 48,
-    color: '#e50914',
+    color: '#ff69b4',
     letterSpacing: 4,
     marginBottom: 20,
   },

@@ -17,13 +17,14 @@ All core challenge requirements are complete:
 - Gemini AI (model: gemini-2.0-flash)
 - GitHub: https://github.com/samsilb/what-to-watch
 
-## Current Theme: Streaming App (Netflix-inspired) + The Big Lebowski
-- Background: #0c0c0c (deep black)
-- Primary accent: #e50914 (cinematic red)
-- Surface: #181818 (dark gray cards)
-- Text: #ffffff (white) / #b3b3b3 (secondary)
+## Current Theme: Streaming App + Clueless (Cher Horowitz vibes)
+- Background: #1a0a14 (dark burgundy)
+- Primary accent: #ff69b4 (hot pink)
+- Secondary accent: #ffeb3b (yellow - Cher's iconic plaid)
+- Surface: #2d1a24 (mauve cards)
+- Text: #ffffff (white) / #e8b4d4 (pink-tinted secondary)
 - Fonts: Bebas Neue (headings), Oswald (UI text)
-- Loading phrases: The Dude quotes from The Big Lebowski
+- Loading phrases: Cher quotes from Clueless ("As if!", "Whatever!", etc.)
 - Layout: Hero banner, horizontal carousels, poster cards
 
 ## Key Files

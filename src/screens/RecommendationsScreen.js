@@ -27,11 +27,14 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = 120;
 const CARD_HEIGHT = 180;
 
-// The Dude loading phrases - just the classics
-const DUDE_LOADING_PHRASES = [
-  "The Dude abides...",
-  "Yeah, well, that's just, like, your opinion, man.",
-  "That rug really tied the room together.",
+// Cher loading phrases - totally Clueless
+const CHER_LOADING_PHRASES = [
+  "As if!",
+  "Ugh, I was like, totally buggin'...",
+  "Whatever!",
+  "I totally paused!",
+  "Searching for a boy in high school is as useless as searching for meaning in a Pauly Shore movie.",
+  "You see how picky I am about my shoes, and they only go on my feet.",
 ];
 
 // Fallback poster image
@@ -60,7 +63,7 @@ export default function RecommendationsScreen() {
   const [savingId, setSavingId] = useState(null);
   const [selectedGenres, setSelectedGenres] = useState([]);
   const [featuredItem, setFeaturedItem] = useState(null);
-  const [loadingPhrase, setLoadingPhrase] = useState(DUDE_LOADING_PHRASES[0]);
+  const [loadingPhrase, setLoadingPhrase] = useState(CHER_LOADING_PHRASES[0]);
 
   // Detail modal state
   const [selectedItem, setSelectedItem] = useState(null);
@@ -82,7 +85,7 @@ export default function RecommendationsScreen() {
         }).start(() => {
           // Change phrase
           setLoadingPhrase(
-            DUDE_LOADING_PHRASES[Math.floor(Math.random() * DUDE_LOADING_PHRASES.length)]
+            CHER_LOADING_PHRASES[Math.floor(Math.random() * CHER_LOADING_PHRASES.length)]
           );
           // Fade in
           Animated.timing(phraseOpacity, {
@@ -240,18 +243,18 @@ export default function RecommendationsScreen() {
     setSavingId(item.title);
     const result = await saveFavorite(user.uid, item);
     if (result.success) {
-      Alert.alert('Far out.', `"${cleanTitle(item.title)}" is on your list, man.`);
+      Alert.alert('Totally!', `"${cleanTitle(item.title)}" is on your list. As if you'd forget!`);
       loadFavorites();
     } else {
-      Alert.alert("That's a bummer, man", 'Couldn\'t save. Give it another shot.');
+      Alert.alert("Ugh, as if!", 'Couldn\'t save. Try again!');
     }
     setSavingId(null);
   };
 
   const handleRemove = async (favoriteId, title) => {
     Alert.alert(
-      'This will not stand, man',
-      `Remove "${cleanTitle(title)}" from your list?`,
+      'Wait, are you sure?',
+      `Remove "${cleanTitle(title)}" from your list? That would be way harsh.`,
       [
         { text: 'Nevermind', style: 'cancel' },
         {
@@ -304,10 +307,10 @@ export default function RecommendationsScreen() {
   };
 
   // Loading Component with Cher phrases
-  const DudeLoading = ({ size = 'large' }) => (
-    <View style={styles.dudeLoadingContainer}>
+  const CherLoading = ({ size = 'large' }) => (
+    <View style={styles.cherLoadingContainer}>
       <ActivityIndicator size={size} color={colors.primary} />
-      <Animated.Text style={[styles.dudeLoadingText, { opacity: phraseOpacity }]}>
+      <Animated.Text style={[styles.cherLoadingText, { opacity: phraseOpacity }]}>
         {loadingPhrase}
       </Animated.Text>
     </View>
@@ -364,6 +367,26 @@ export default function RecommendationsScreen() {
                 <Text style={styles.modalDescription}>
                   {selectedItem.description || selectedItem.overview}
                 </Text>
+              )}
+
+              {/* Where to Watch */}
+              {selectedItem.watchProviders && selectedItem.watchProviders.length > 0 && (
+                <View style={styles.watchProvidersSection}>
+                  <Text style={styles.watchProvidersLabel}>Where to Watch</Text>
+                  <View style={styles.watchProvidersList}>
+                    {selectedItem.watchProviders.map((provider) => (
+                      <View key={provider.id} style={styles.watchProviderItem}>
+                        <Image
+                          source={{ uri: provider.logo }}
+                          style={styles.watchProviderLogo}
+                        />
+                        <Text style={styles.watchProviderName} numberOfLines={1}>
+                          {provider.name}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
               )}
 
               {/* Action Buttons */}
@@ -529,7 +552,7 @@ export default function RecommendationsScreen() {
         </View>
 
         {loading ? (
-          <DudeLoading />
+          <CherLoading />
         ) : (
           <FlatList
             data={searchResults}
@@ -573,7 +596,7 @@ export default function RecommendationsScreen() {
       {loadingCategories ? (
         <View style={styles.fullScreenLoading}>
           <Text style={styles.loadingLogo}>LA CINE</Text>
-          <DudeLoading />
+          <CherLoading />
         </View>
       ) : (
         <ScrollView
@@ -754,13 +777,13 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
 
-  // Dude Loading
-  dudeLoadingContainer: {
+  // Cher Loading
+  cherLoadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     padding: 40,
   },
-  dudeLoadingText: {
+  cherLoadingText: {
     fontFamily: fonts.regular,
     color: colors.textSecondary,
     fontSize: 18,
@@ -1095,6 +1118,38 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: 22,
     marginBottom: 24,
+  },
+  watchProvidersSection: {
+    marginBottom: 20,
+  },
+  watchProvidersLabel: {
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    color: colors.text,
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  watchProvidersList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  watchProviderItem: {
+    alignItems: 'center',
+    width: 60,
+  },
+  watchProviderLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+  },
+  watchProviderName: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    marginTop: 4,
+    textAlign: 'center',
   },
   modalButtons: {
     gap: 12,

@@ -68,6 +68,61 @@ export async function searchContent(title, type = 'multi') {
   }
 }
 
+// Fetch watch providers for a movie or TV show
+export async function fetchWatchProviders(tmdbId, mediaType = 'movie') {
+  if (!TMDB_API_KEY || !tmdbId) {
+    return [];
+  }
+
+  try {
+    const response = await fetch(
+      `${TMDB_BASE_URL}/${mediaType}/${tmdbId}/watch/providers?api_key=${TMDB_API_KEY}`
+    );
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const data = await response.json();
+
+    // Get US providers (or empty if not available)
+    const usProviders = data.results?.US;
+    if (!usProviders) return [];
+
+    // Combine flatrate (subscription), rent, and buy options
+    const providers = [];
+
+    if (usProviders.flatrate) {
+      usProviders.flatrate.forEach(p => {
+        providers.push({
+          id: p.provider_id,
+          name: p.provider_name,
+          logo: `${TMDB_IMAGE_BASE}/w92${p.logo_path}`,
+          type: 'stream',
+        });
+      });
+    }
+
+    if (usProviders.rent && providers.length < 6) {
+      usProviders.rent.slice(0, 3).forEach(p => {
+        if (!providers.find(existing => existing.id === p.provider_id)) {
+          providers.push({
+            id: p.provider_id,
+            name: p.provider_name,
+            logo: `${TMDB_IMAGE_BASE}/w92${p.logo_path}`,
+            type: 'rent',
+          });
+        }
+      });
+    }
+
+    return providers.slice(0, 6); // Max 6 providers
+  } catch (error) {
+    console.error('TMDB watch providers error:', error);
+    return [];
+  }
+}
+
 // Fetch poster and metadata for a single title
 export async function fetchContentDetails(title) {
   const result = await searchContent(title);
@@ -79,14 +134,19 @@ export async function fetchContentDetails(title) {
       year: null,
       rating: null,
       overview: null,
+      watchProviders: [],
     };
   }
 
   const isTV = result.media_type === 'tv' || result.first_air_date;
+  const mediaType = isTV ? 'tv' : 'movie';
+
+  // Fetch watch providers
+  const watchProviders = await fetchWatchProviders(result.id, mediaType);
 
   return {
     tmdbId: result.id,
-    mediaType: isTV ? 'tv' : 'movie',
+    mediaType,
     poster: getPosterUrl(result.poster_path, 'medium'),
     posterLarge: getPosterUrl(result.poster_path, 'large'),
     backdrop: getBackdropUrl(result.backdrop_path, 'large'),
@@ -94,6 +154,7 @@ export async function fetchContentDetails(title) {
     rating: result.vote_average ? result.vote_average.toFixed(1) : null,
     overview: result.overview,
     popularity: result.popularity,
+    watchProviders,
   };
 }
 

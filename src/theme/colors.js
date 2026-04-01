@@ -1,33 +1,33 @@
 export const colors = {
-  // Core backgrounds
-  background: '#0c0c0c',
-  surface: '#181818',
-  surfaceLight: '#232323',
-  surfaceHover: '#2a2a2a',
+  // Core backgrounds (90s glam dark)
+  background: '#1a0a14',
+  surface: '#2d1a24',
+  surfaceLight: '#3d2a34',
+  surfaceHover: '#4d3a44',
 
-  // Brand accent (cinematic red)
-  primary: '#e50914',
-  primaryDark: '#b20710',
-  primaryLight: '#ff1a1a',
+  // Brand accent (Clueless pink/yellow)
+  primary: '#ff69b4', // Hot pink
+  primaryDark: '#db4d94',
+  primaryLight: '#ff85c1',
 
   // Secondary accents
-  accent: '#46d369', // Netflix green for "new" badges
-  gold: '#f5c518', // IMDb-style gold for ratings
+  accent: '#ffeb3b', // Cher's yellow plaid
+  gold: '#ffd700', // Gold for ratings
 
   // Text
   text: '#ffffff',
-  textSecondary: '#b3b3b3',
-  textMuted: '#808080',
-  textDark: '#5a5a5a',
+  textSecondary: '#e8b4d4',
+  textMuted: '#b388a2',
+  textDark: '#8a6278',
 
   // Utility
-  success: '#46d369',
-  warning: '#f5c518',
-  error: '#e50914',
+  success: '#98d982',
+  warning: '#ffeb3b',
+  error: '#ff6b9d',
 
   // Gradients (for hero overlays)
-  gradientStart: 'rgba(12, 12, 12, 0)',
-  gradientEnd: 'rgba(12, 12, 12, 1)',
+  gradientStart: 'rgba(26, 10, 20, 0)',
+  gradientEnd: 'rgba(26, 10, 20, 1)',
 };
 
 // Font families - use these throughout the app
