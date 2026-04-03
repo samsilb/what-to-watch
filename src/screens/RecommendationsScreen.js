@@ -17,11 +17,16 @@ import {
   Animated,
   Modal,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { getRecommendations } from '../lib/aiClient';
 import { fetchContentDetails } from '../lib/tmdb';
 import { saveFavorite, getFavorites, removeFavorite, rateFavorite } from '../lib/favorites';
 import { colors, fonts } from '../theme/colors';
+
+// Cache settings
+const CACHE_KEY = 'la_cine_recommendations';
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = 120;
@@ -118,6 +123,7 @@ export default function RecommendationsScreen() {
             year: tmdbData.year,
             tmdbRating: tmdbData.rating,
             overview: tmdbData.overview,
+            watchProviders: tmdbData.watchProviders,
           };
         })
       );
@@ -125,10 +131,30 @@ export default function RecommendationsScreen() {
     }
   };
 
-  const loadCategoryContent = async () => {
+  const loadCategoryContent = async (forceRefresh = false) => {
     setLoadingCategories(true);
     try {
-      // Load all categories
+      // Check cache first (unless forcing refresh)
+      if (!forceRefresh) {
+        const cached = await AsyncStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const { content, timestamp } = JSON.parse(cached);
+          const isExpired = Date.now() - timestamp > CACHE_DURATION;
+
+          if (!isExpired && content) {
+            console.log('Using cached recommendations');
+            setCategoryContent(content);
+            if (content[CATEGORIES[0].id]?.length > 0) {
+              setFeaturedItem(content[CATEGORIES[0].id][0]);
+            }
+            setLoadingCategories(false);
+            return;
+          }
+        }
+      }
+
+      // Load all categories from API
+      console.log('Fetching fresh recommendations from API');
       const content = {};
       for (const cat of CATEGORIES) {
         const recs = await getRecommendations(cat.query, { genres: [] });
@@ -144,12 +170,19 @@ export default function RecommendationsScreen() {
               year: tmdbData.year,
               rating: tmdbData.rating,
               overview: tmdbData.overview,
+              watchProviders: tmdbData.watchProviders,
             };
           })
         );
 
         content[cat.id] = recsWithPosters;
       }
+
+      // Save to cache
+      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
+        content,
+        timestamp: Date.now(),
+      }));
 
       // Set featured item from first category
       if (content[CATEGORIES[0].id]?.length > 0) {
@@ -159,6 +192,18 @@ export default function RecommendationsScreen() {
       setCategoryContent(content);
     } catch (e) {
       console.log('Error loading categories:', e);
+      // Try to use stale cache if API fails
+      const cached = await AsyncStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { content } = JSON.parse(cached);
+        if (content) {
+          console.log('API failed, using stale cache');
+          setCategoryContent(content);
+          if (content[CATEGORIES[0].id]?.length > 0) {
+            setFeaturedItem(content[CATEGORIES[0].id][0]);
+          }
+        }
+      }
     } finally {
       setLoadingCategories(false);
     }
@@ -191,6 +236,7 @@ export default function RecommendationsScreen() {
               year: tmdbData.year,
               rating: tmdbData.rating,
               overview: tmdbData.overview,
+              watchProviders: tmdbData.watchProviders,
             };
           })
         );
@@ -243,7 +289,7 @@ export default function RecommendationsScreen() {
     setSavingId(item.title);
     const result = await saveFavorite(user.uid, item);
     if (result.success) {
-      Alert.alert('Totally!', `"${cleanTitle(item.title)}" is on your list. As if you'd forget!`);
+      Alert.alert('Totally!', "Added to your favorites. As if you'd forget!");
       loadFavorites();
     } else {
       Alert.alert("Ugh, as if!", 'Couldn\'t save. Try again!');
@@ -449,16 +495,6 @@ export default function RecommendationsScreen() {
       {item.rating && (
         <View style={styles.ratingBadge}>
           <Text style={styles.ratingBadgeText}>{item.rating}</Text>
-        </View>
-      )}
-      {item.year && (
-        <View style={styles.yearBadge}>
-          <Text style={styles.yearBadgeText}>{item.year}</Text>
-        </View>
-      )}
-      {isAlreadySaved(item.title) && (
-        <View style={styles.savedBadge}>
-          <Text style={styles.savedBadgeText}>In My List</Text>
         </View>
       )}
     </Pressable>
@@ -1003,7 +1039,7 @@ const styles = StyleSheet.create({
   },
   ratingBadge: {
     position: 'absolute',
-    top: 8,
+    bottom: 8,
     left: 8,
     backgroundColor: colors.gold,
     paddingHorizontal: 6,
